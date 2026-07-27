@@ -1,10 +1,75 @@
-# Python-generated files
+# -----------------------------
+# Python bytecode / caches
+# -----------------------------
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+
+# -----------------------------
+# Virtual environments
+# -----------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# -----------------------------
+# Build / packaging
+# -----------------------------
 build/
 dist/
 wheels/
-*.egg-info
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
 
-# Virtual environments
-.venv
+# -----------------------------
+# Test / coverage / type-check
+# -----------------------------
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+
+# -----------------------------
+# Logs / runtime files
+# -----------------------------
+*.log
+*.pid
+*.seed
+*.out
+*.err
+
+# -----------------------------
+# Local environment / secrets
+# -----------------------------
+.env
+.env.*
+
+# -----------------------------
+# Editors / OS
+# -----------------------------
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# -----------------------------
+# Alembic / local DB artifacts
+# -----------------------------
+*.db
+*.sqlite3
+
+# -----------------------------
+# Front-end (if used inside Front-End)
+# -----------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
