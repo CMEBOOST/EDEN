@@ -31,6 +31,7 @@ app.include_router(routers.upload_router)
 app.include_router(routers.tenant_router)
 app.include_router(routers.document_router)
 app.include_router(routers.contract_router)
+app.include_router(routers.rate_router)
 
 
 @app.get("/")

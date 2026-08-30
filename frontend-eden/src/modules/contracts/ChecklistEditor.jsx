@@ -3,8 +3,8 @@ import { apiUpload, fileUrl } from "../../lib/api";
 
 const STATUS_OPTIONS = ["ปกติ", "ชำรุด", "ต้องซ่อม"];
 
-const inputCls =
-  "border border-gray-300 rounded px-2 py-1.5 text-sm outline-none focus:border-blue-500 w-full";
+const baseCls =
+  "border border-gray-300 rounded px-2 py-1.5 text-sm outline-none focus:border-blue-500";
 
 // value = [{name, status, note, photos:[url]}], onChange(newValue)
 function ChecklistEditor({ value, onChange }) {
@@ -44,17 +44,20 @@ function ChecklistEditor({ value, onChange }) {
           key={i}
           className="border border-gray-200 rounded-lg p-3 flex flex-col gap-2"
         >
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
+            <span className="text-xs text-gray-400 w-5 shrink-0 text-right">
+              {i + 1}
+            </span>
             <input
               placeholder="รายการ (เช่น แอร์)"
               value={row.name}
               onChange={(e) => update(i, { name: e.target.value })}
-              className={`${inputCls} flex-1`}
+              className={`${baseCls} flex-1 min-w-0`}
             />
             <select
               value={row.status}
               onChange={(e) => update(i, { status: e.target.value })}
-              className={`${inputCls} w-28`}
+              className={`${baseCls} w-28 shrink-0`}
             >
               {STATUS_OPTIONS.map((s) => (
                 <option key={s} value={s}>
@@ -65,7 +68,7 @@ function ChecklistEditor({ value, onChange }) {
             <button
               type="button"
               onClick={() => removeRow(i)}
-              className="px-2 text-red-600 hover:bg-red-50 rounded text-sm"
+              className="px-2 text-red-600 hover:bg-red-50 rounded text-sm shrink-0"
             >
               ลบ
             </button>
@@ -75,7 +78,7 @@ function ChecklistEditor({ value, onChange }) {
             placeholder="หมายเหตุ"
             value={row.note ?? ""}
             onChange={(e) => update(i, { note: e.target.value })}
-            className={inputCls}
+            className={`${baseCls} w-full`}
           />
 
           <div className="flex flex-wrap items-center gap-2">

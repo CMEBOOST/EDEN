@@ -85,3 +85,10 @@ class RateConfig(BaseModel):
     type: RateType
     rate_value: float
     effective_date: datetime.date
+    created_by: int | None = None
+
+
+class RateConfigUpdate(BaseModel):
+    type: RateType | None = None
+    rate_value: float | None = None
+    effective_date: datetime.date | None = None

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet } from "../../lib/api";
+import { apiGet, apiDelete } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import ContractEditForm from "./ContractEditForm";
 
 // status ตรงกับ contract_status_enum ใน backend
 const statusStyle = {
@@ -25,6 +27,29 @@ function Contracts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  const upsertContract = (saved) =>
+    setContracts((prev) =>
+      prev.map((c) => (c.contract_id === saved.contract_id ? saved : c))
+    );
+
+  async function handleDelete() {
+    setDeleteBusy(true);
+    try {
+      await apiDelete(`/contracts/${deleting.contract_id}`);
+      setContracts((prev) =>
+        prev.filter((c) => c.contract_id !== deleting.contract_id)
+      );
+      setDeleting(null);
+    } catch (e) {
+      alert(`ลบไม่สำเร็จ: ${e.message}`);
+    } finally {
+      setDeleteBusy(false);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -178,10 +203,16 @@ function Contracts() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-2">
-                      <button className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50">
+                      <button
+                        onClick={() => setEditing(c)}
+                        className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
+                      >
                         แก้ไข
                       </button>
-                      <button className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50">
+                      <button
+                        onClick={() => setDeleting(c)}
+                        className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
+                      >
                         ลบ
                       </button>
                     </div>
@@ -191,6 +222,28 @@ function Contracts() {
           </tbody>
         </table>
       </div>
+
+      {editing && (
+        <ContractEditForm
+          contract={editing}
+          onClose={() => setEditing(null)}
+          onSaved={upsertContract}
+        />
+      )}
+
+      {deleting && (
+        <ConfirmDialog
+          title="ลบสัญญา"
+          message={`ต้องการลบสัญญา #${deleting.contract_id} (${tenantName(
+            deleting.tenant_id
+          )}) ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`}
+          confirmText="ลบ"
+          danger
+          busy={deleteBusy}
+          onConfirm={handleDelete}
+          onClose={() => setDeleting(null)}
+        />
+      )}
     </div>
   );
 }

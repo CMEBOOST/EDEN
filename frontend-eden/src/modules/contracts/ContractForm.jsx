@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost, apiUpload } from "../../lib/api";
 import ChecklistEditor from "./ChecklistEditor";
 import DocumentUploader from "./DocumentUploader";
+import FileDropField from "../../components/FileDropField";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
@@ -235,12 +236,7 @@ function ContractForm() {
         </Field>
 
         <Field label="ไฟล์สัญญา (PDF / รูป)">
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            onChange={(e) => setContractFile(e.target.files[0] ?? null)}
-            className="text-sm"
-          />
+          <FileDropField value={contractFile} onChange={setContractFile} />
         </Field>
       </Card>
 

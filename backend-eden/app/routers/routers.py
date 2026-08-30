@@ -6,6 +6,7 @@ from ..crud import (
     checklist_crud,
     contracts_crud,
     document_crud,
+    rate_crud,
     tenent_crud,
     user_crud,
 )
@@ -182,3 +183,45 @@ def create_checklist_route(
 @contract_router.get("/{contract_id}/checklists")
 def list_checklists_route(contract_id: int, db: Session = Depends(get_db)):
     return checklist_crud.get_checklists(db=db, contract_id=contract_id)
+
+
+# ---------------------------------------------------------------------------
+# Rate configs (อัตราค่าน้ำ / ค่าไฟ)
+# ---------------------------------------------------------------------------
+rate_router = APIRouter(prefix="/rates", tags=["Rates"])
+
+
+@rate_router.post("/")
+def create_rate_route(rate: schemas.RateConfig, db: Session = Depends(get_db)):
+    return rate_crud.create_rate(db=db, rate=rate)
+
+
+@rate_router.get("/")
+def list_rates_route(type: str | None = None, db: Session = Depends(get_db)):
+    return rate_crud.get_rates(db=db, type_=type)
+
+
+@rate_router.get("/{rate_id}")
+def get_rate_route(rate_id: int, db: Session = Depends(get_db)):
+    rate = rate_crud.get_rate(db=db, rate_id=rate_id)
+    if rate is None:
+        raise HTTPException(status_code=404, detail="ไม่พบอัตราค่าบริการ")
+    return rate
+
+
+@rate_router.put("/{rate_id}")
+def update_rate_route(
+    rate_id: int, data: schemas.RateConfigUpdate, db: Session = Depends(get_db)
+):
+    rate = rate_crud.update_rate(db=db, rate_id=rate_id, data=data)
+    if rate is None:
+        raise HTTPException(status_code=404, detail="ไม่พบอัตราค่าบริการ")
+    return rate
+
+
+@rate_router.delete("/{rate_id}")
+def delete_rate_route(rate_id: int, db: Session = Depends(get_db)):
+    rate = rate_crud.delete_rate(db=db, rate_id=rate_id)
+    if rate is None:
+        raise HTTPException(status_code=404, detail="ไม่พบอัตราค่าบริการ")
+    return {"delete": "ok"}
