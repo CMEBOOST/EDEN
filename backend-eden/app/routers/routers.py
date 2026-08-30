@@ -16,6 +16,7 @@ from ..crud import (
     audit_crud,
     checklist_crud,
     contracts_crud,
+    dashboard_crud,
     document_crud,
     rate_crud,
     tenent_crud,
@@ -23,12 +24,13 @@ from ..crud import (
 )
 from ..database import get_db
 from ..models import models
-from ..models.models import RateType
+from ..models.models import ContractStatus, RateType
 from ..schemas import schemas
 
-# ทุก router (ยกเว้น auth) ต้องล็อกอินก่อน — write ต้องเป็น staff+ ขึ้นไป
+# ทุก router (ยกเว้น auth) ต้องล็อกอินก่อน · write = staff+ · ตั้งค่าระบบ = admin
 _auth = [Depends(get_current_user)]
 _staff = [Depends(require_staff)]
+_admin = [Depends(require_admin)]
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +135,7 @@ def upload_file_route(file: UploadFile = File(...)):
 # ---------------------------------------------------------------------------
 # Tenants
 # ---------------------------------------------------------------------------
-tenant_router = APIRouter(prefix="/tenants", tags=["Tenants"], dependencies=_auth)
+tenant_router = APIRouter(prefix="/tenants", tags=["Tenants"], dependencies=_staff)
 
 
 @tenant_router.post("/", dependencies=_staff)
@@ -166,12 +168,14 @@ def update_tenant_route(
     return tenant
 
 
-@tenant_router.delete("/{tenant_id}", dependencies=_staff)
+@tenant_router.delete("/{tenant_id}", dependencies=_admin)
 def delete_tenant_route(tenant_id: int, db: Session = Depends(get_db)):
-    tenant = tenent_crud.delete_tenant(db=db, tenant_id=tenant_id)
+    """soft delete — ปิดการใช้งาน user ที่ผูกกับผู้เช่า (ไม่ลบข้อมูลจริง)"""
+    tenant = tenent_crud.get_tenant(db=db, tenant_id=tenant_id)
     if tenant is None:
         raise HTTPException(status_code=404, detail="ไม่พบผู้เช่า")
-    return {"delete": "ok"}
+    user_crud.set_active(db, tenant.user_id, False)
+    return {"ok": True}
 
 
 # --- เอกสารของผู้เช่า ---
@@ -204,7 +208,7 @@ def delete_document_route(doc_id: int, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # Contracts
 # ---------------------------------------------------------------------------
-contract_router = APIRouter(prefix="/contracts", tags=["Contracts"], dependencies=_auth)
+contract_router = APIRouter(prefix="/contracts", tags=["Contracts"], dependencies=_staff)
 
 
 @contract_router.post("/", dependencies=_staff)
@@ -241,17 +245,23 @@ def get_contract_route(contract_id: int, db: Session = Depends(get_db)):
     return contract
 
 
-@contract_router.put("/{contract_id}", dependencies=_staff)
+@contract_router.put("/{contract_id}")
 def update_contract_route(
-    contract_id: int, data: schemas.ContractUpdate, db: Session = Depends(get_db)
+    contract_id: int,
+    data: schemas.ContractUpdate,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(require_staff),
 ):
+    # ยุติสัญญา (terminated) = เฉพาะ admin (UC3.5)
+    if data.status == ContractStatus.terminated and me.role != models.Role.admin:
+        raise HTTPException(status_code=403, detail="เฉพาะผู้ดูแลระบบยุติสัญญาได้")
     contract = contracts_crud.update_contract(db=db, contract_id=contract_id, data=data)
     if contract is None:
         raise HTTPException(status_code=404, detail="ไม่พบสัญญา")
     return contract
 
 
-@contract_router.delete("/{contract_id}", dependencies=_staff)
+@contract_router.delete("/{contract_id}", dependencies=_admin)
 def delete_contract_route(contract_id: int, db: Session = Depends(get_db)):
     contract = contracts_crud.delete_contract(db=db, contract_id=contract_id)
     if contract is None:
@@ -280,7 +290,7 @@ def list_checklists_route(contract_id: int, db: Session = Depends(get_db)):
 rate_router = APIRouter(prefix="/rates", tags=["Rates"], dependencies=_auth)
 
 
-@rate_router.post("/", dependencies=_staff)
+@rate_router.post("/", dependencies=_admin)
 def create_rate_route(rate: schemas.RateConfig, db: Session = Depends(get_db)):
     dup = rate_crud.rate_exists(db, rate.type, rate.effective_date)
     if dup is not None:
@@ -294,7 +304,7 @@ def create_rate_route(rate: schemas.RateConfig, db: Session = Depends(get_db)):
     return rate_crud.create_rate(db=db, rate=rate)
 
 
-@rate_router.get("/")
+@rate_router.get("/", dependencies=_staff)
 def list_rates_route(type: str | None = None, db: Session = Depends(get_db)):
     return rate_crud.get_rates(db=db, type_=type)
 
@@ -319,7 +329,7 @@ def get_rate_route(rate_id: int, db: Session = Depends(get_db)):
     return rate
 
 
-@rate_router.put("/{rate_id}", dependencies=_staff)
+@rate_router.put("/{rate_id}", dependencies=_admin)
 def update_rate_route(
     rate_id: int, data: schemas.RateConfigUpdate, db: Session = Depends(get_db)
 ):
@@ -341,7 +351,7 @@ def update_rate_route(
     return rate_crud.update_rate(db=db, rate_id=rate_id, data=data)
 
 
-@rate_router.delete("/{rate_id}", dependencies=_staff)
+@rate_router.delete("/{rate_id}", dependencies=_admin)
 def delete_rate_route(rate_id: int, db: Session = Depends(get_db)):
     rate = rate_crud.delete_rate(db=db, rate_id=rate_id)
     if rate is None:
@@ -366,3 +376,39 @@ def list_audit_logs_route(
     db: Session = Depends(get_db),
 ):
     return audit_crud.get_logs(db, skip=skip, limit=limit, user_id=user_id, q=q)
+
+
+# ---------------------------------------------------------------------------
+# Dashboard (แตกข้อมูลตาม role)
+# ---------------------------------------------------------------------------
+dashboard_router = APIRouter(prefix="/dashboard", tags=["Dashboard"], dependencies=_auth)
+
+
+@dashboard_router.get("/")
+def dashboard_route(
+    db: Session = Depends(get_db), me: models.Users = Depends(get_current_user)
+):
+    role = me.role.value if hasattr(me.role, "value") else me.role
+
+    if role == "tenant":
+        home = dashboard_crud.tenant_home(db, me.user_id)
+        today = datetime.date.today()
+        return {
+            "role": "tenant",
+            "tenant": home["tenant"],
+            "contract": home["contract"],
+            "documents": home["documents"],
+            "rates": {
+                t.value: rate_crud.get_effective_rate(db, t.value, today)
+                for t in RateType
+            },
+        }
+
+    data = {
+        "role": role,
+        "counts": dashboard_crud.counts(db),
+        "expiring": dashboard_crud.expiring_contracts(db, days=30),
+    }
+    if role == "admin":
+        data["monthly_rent_total"] = dashboard_crud.monthly_rent_total(db)
+    return data

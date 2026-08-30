@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiGet, apiDelete } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import { useAuth } from "../../auth/AuthContext";
 import TenantForm from "./TenantForm";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
 function Tenants() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -103,9 +106,9 @@ function Tenants() {
 
       {deleting && (
         <ConfirmDialog
-          title="ลบผู้เช่า"
-          message={`ต้องการลบ "${deleting.full_name}" ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`}
-          confirmText="ลบ"
+          title="ปิดการใช้งานผู้เช่า"
+          message={`ปิดการใช้งาน "${deleting.full_name}" ? บัญชีผู้ใช้จะเข้าสู่ระบบไม่ได้ (ข้อมูลยังเก็บไว้)`}
+          confirmText="ปิดใช้งาน"
           danger
           busy={deleteBusy}
           onConfirm={handleDelete}
@@ -192,12 +195,14 @@ function Tenants() {
                       >
                         แก้ไข
                       </button>
-                      <button
-                        onClick={() => setDeleting(t)}
-                        className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
-                      >
-                        ลบ
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setDeleting(t)}
+                          className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
+                        >
+                          ปิดใช้งาน
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

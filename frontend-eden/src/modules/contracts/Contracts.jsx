@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiDelete } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import { useAuth } from "../../auth/AuthContext";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ContractEditForm from "./ContractEditForm";
 
@@ -22,6 +23,8 @@ const statusLabel = {
 
 function Contracts() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [contracts, setContracts] = useState([]);
   const [tenantsById, setTenantsById] = useState({});
   const [loading, setLoading] = useState(true);
@@ -209,12 +212,14 @@ function Contracts() {
                       >
                         แก้ไข
                       </button>
-                      <button
-                        onClick={() => setDeleting(c)}
-                        className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
-                      >
-                        ลบ
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => setDeleting(c)}
+                          className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
+                        >
+                          ลบ
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

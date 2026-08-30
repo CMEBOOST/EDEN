@@ -58,9 +58,10 @@ EDEN/
 │   │   ├── lib/          # api.js (Bearer header, 401→logout, apiGet/Post/Put/Patch/Delete/Upload/Login), auth.js (token), datetime.js
 │   │   ├── auth/         # AuthContext.jsx (useAuth: user/login/logout), RequireAuth.jsx
 │   │   ├── components/   # ConfirmDialog.jsx, FileDropField.jsx
-│   │   ├── layout/       # Sidebar.jsx (ซ่อนเมนู admin), Topbar.jsx (ชื่อ+role+logout)
-│   │   ├── pages/        # Login.jsx, Home.jsx, About.jsx, Menu.jsx
+│   │   ├── layout/       # Sidebar.jsx (เมนูตาม role), Topbar.jsx (ชื่อ+role+logout)
+│   │   ├── pages/        # Login.jsx, About.jsx, Menu.jsx
 │   │   └── modules/
+│   │       ├── dashboard/ Dashboard.jsx (หน้า `/` — แตกตาม role: admin/staff KPI, tenant สัญญาตัวเอง)
 │   │       ├── users/     Users.jsx (จัดการสิทธิ์ /permission — admin), UserForm.jsx
 │   │       ├── audit/     AuditLog.jsx (/log — admin, filter user + ค้นหา + โหลดเพิ่ม)
 │   │       ├── tenants/   Tenants.jsx (list+CRUD), TenantForm.jsx
@@ -134,8 +135,15 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | GET | `/rates/current` | อัตราที่มีผล ณ วันนี้ (หรือ `?date=`) → `{water: {...}\|null, electric: {...}\|null}` |
 | GET/PUT/DELETE | `/rates/{rate_id}` | อ่าน / แก้ (`RateConfigUpdate`, PUT เข้า slot ที่มีแล้ว → 409) / ลบ |
 | GET | `/audit-logs/` | **admin เท่านั้น** — query `skip`,`limit`,`user_id`,`q` (ค้นข้อความ action) |
+| GET | `/dashboard/` | ข้อมูลแตกตาม role — admin: `counts`+`expiring`+`monthly_rent_total` · staff: ไม่มี rent_total · tenant: `{tenant, contract, documents, rates}` ของตัวเอง |
 
-**Auth:** ทุก endpoint (ยกเว้น `/auth/login`) ต้องส่ง header `Authorization: Bearer <JWT>` · route ที่เขียนข้อมูล (POST/PUT/PATCH/DELETE) ต้องเป็น role `staff` หรือ `admin` · `/users/*` + `/audit-logs/` = `admin` เท่านั้น · `/uploads/<file>` (static) ยังเปิดอ่านได้ไม่ต้อง token (dev)
+**Auth / RBAC** (ตาม Permission Matrix v1.0):
+- ทุก endpoint (ยกเว้น `/auth/login`) ต้องมี `Authorization: Bearer <JWT>`
+- **admin เท่านั้น**: `/users/*`, `/audit-logs/`, `/rates/` (create/update/delete), `DELETE /tenants|/contracts`, ยุติสัญญา (PUT contract `status=terminated`)
+- **staff+**: `/tenants/*`, `/contracts/*` (ทั้ง router), `GET /rates/`, POST/PUT อื่น ๆ
+- **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/rates/current` — เข้า `/tenants` `/contracts` `/rates` list → 403
+- `DELETE /tenants/{id}` = **soft delete** (ปิด `is_active` ของ user ที่ผูก, ข้อมูลไม่หาย)
+- `/uploads/<file>` (static) ยังเปิดอ่านได้ไม่ต้อง token (dev)
 
 **Audit log:** `AuditMiddleware` ([app/core/audit.py](backend-eden/app/core/audit.py)) บันทึกทุก request ที่ method เป็น POST/PUT/PATCH/DELETE + สำเร็จ (2xx) ลง `audit_logs` โดย decode token เอาว่าใครทำ + `describe()` แปลง method+path เป็นข้อความไทย · login บันทึกแยกใน route
 
@@ -224,10 +232,12 @@ npm run dev
 - [ ] เขียน tests
 
 **Frontend**
-- [x] auth: Login page, AuthContext, RequireAuth, Bearer header, role-aware Sidebar/Topbar, หน้าจัดการสิทธิ์, หน้า Audit Log
+- [x] auth: Login page, AuthContext, RequireAuth, Bearer header, role-aware Sidebar/Topbar, จัดการสิทธิ์, Audit Log
+- [x] Dashboard หน้า `/` แตกตาม role (admin KPI+รายได้, staff KPI, tenant สัญญา+เอกสารตัวเอง)
+- [x] RBAC frontend — เมนู/route จำกัดตาม role, ซ่อนปุ่มลบ/ยุติสัญญาสำหรับ non-admin
 - [x] ต่อ API จริง (`lib/api.js`), หน้า Tenants / Contracts / Rates (list + เพิ่ม/แก้/ลบ), ContractForm
+- [ ] tenant portal เต็ม: แก้ข้อมูลตัวเอง (UC2.5), เปลี่ยนรหัสผ่าน (UC6.2)
 - [ ] หน้า contract detail (ดู/แก้ checklist + เอกสารของสัญญา)
-- [ ] dashboard (หน้าแรกยัง placeholder)
 - [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)
 
 **Infra**

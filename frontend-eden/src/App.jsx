@@ -10,8 +10,8 @@ import RequireAuth from "./auth/RequireAuth";
 import Sidebar from "./layout/Sidebar";
 import TopBar from "./layout/Topbar";
 import Login from "./pages/Login";
-import Home from "./pages/Home";
 import Menu from "./pages/Menu";
+import Dashboard from "./modules/dashboard/Dashboard";
 import Contracts from "./modules/contracts/Contracts";
 import ContractForm from "./modules/contracts/ContractForm";
 import Tenants from "./modules/tenants/Tenants";
@@ -49,12 +49,40 @@ function App() {
               </RequireAuth>
             }
           >
-            <Route path="/" element={<Home />} />
+            <Route path="/" element={<Dashboard />} />
             <Route path="/menu" element={<Menu />} />
-            <Route path="/tenants" element={<Tenants />} />
-            <Route path="/contracts" element={<Contracts />} />
-            <Route path="/contracts/new" element={<ContractForm />} />
-            <Route path="/rate" element={<Rates />} />
+            <Route
+              path="/tenants"
+              element={
+                <RequireAuth roles={["admin", "staff"]}>
+                  <Tenants />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/contracts"
+              element={
+                <RequireAuth roles={["admin", "staff"]}>
+                  <Contracts />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/contracts/new"
+              element={
+                <RequireAuth roles={["admin", "staff"]}>
+                  <ContractForm />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/rate"
+              element={
+                <RequireAuth roles={["admin"]}>
+                  <Rates />
+                </RequireAuth>
+              }
+            />
             <Route
               path="/permission"
               element={

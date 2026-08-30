@@ -38,6 +38,7 @@ app.include_router(routers.document_router)
 app.include_router(routers.contract_router)
 app.include_router(routers.rate_router)
 app.include_router(routers.audit_router)
+app.include_router(routers.dashboard_router)
 
 
 @app.get("/")

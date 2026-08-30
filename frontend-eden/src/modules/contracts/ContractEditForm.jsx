@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiPut, apiUpload, fileUrl } from "../../lib/api";
+import { useAuth } from "../../auth/AuthContext";
 import FileDropField from "../../components/FileDropField";
 
 const inputCls =
@@ -22,6 +23,8 @@ function Field({ label, children }) {
 }
 
 function ContractEditForm({ contract, onClose, onSaved }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const [form, setForm] = useState({
     room_id: contract.room_id ?? "",
     start_date: contract.start_date ?? "",
@@ -119,8 +122,13 @@ function ContractEditForm({ contract, onClose, onSaved }) {
                 className={inputCls}
               >
                 {STATUS_OPTIONS.map(([v, label]) => (
-                  <option key={v} value={v}>
+                  <option
+                    key={v}
+                    value={v}
+                    disabled={v === "terminated" && !isAdmin}
+                  >
                     {label}
+                    {v === "terminated" && !isAdmin ? " (เฉพาะ admin)" : ""}
                   </option>
                 ))}
               </select>
