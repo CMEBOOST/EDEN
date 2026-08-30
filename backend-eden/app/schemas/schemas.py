@@ -11,6 +11,29 @@ class User(BaseModel):
     role: Role
 
 
+class UserOut(BaseModel):
+    user_id: int
+    username: str
+    role: Role
+    is_active: bool
+    created_at: datetime.datetime
+
+    model_config = {"from_attributes": True}
+
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class RoleUpdate(BaseModel):
+    role: Role
+
+
+class UserActiveUpdate(BaseModel):
+    is_active: bool
+
+
 class Tenants(BaseModel):
     user_id: int
     full_name: str

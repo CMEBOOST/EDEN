@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiPost, apiUpload } from "../../lib/api";
+import { formatDate } from "../../lib/datetime";
 import ChecklistEditor from "./ChecklistEditor";
 import DocumentUploader from "./DocumentUploader";
 import FileDropField from "../../components/FileDropField";
+
+const fmtBaht = (n) =>
+  Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
@@ -66,6 +70,7 @@ function ContractForm() {
   const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
   const [documents, setDocuments] = useState([]);
 
+  const [rates, setRates] = useState(null); // อัตราค่าน้ำ/ค่าไฟ ณ วันเริ่มสัญญา (แสดงเฉย ๆ)
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -74,6 +79,14 @@ function ContractForm() {
       .then(setTenants)
       .catch((e) => setError(e.message));
   }, []);
+
+  // ดึงอัตราที่มีผล ณ วันเริ่มสัญญา (ไม่ได้เก็บลง contract — ใช้ประกอบการพิจารณา)
+  useEffect(() => {
+    const q = contract.start_date ? `?date=${contract.start_date}` : "";
+    apiGet(`/rates/current${q}`)
+      .then(setRates)
+      .catch(() => setRates(null));
+  }, [contract.start_date]);
 
   const set = (key) => (e) =>
     setContract((c) => ({ ...c, [key]: e.target.value }));
@@ -224,6 +237,33 @@ function ContractForm() {
               ))}
             </select>
           </Field>
+        </div>
+
+        <div className="bg-sky-50 border border-sky-100 rounded-lg p-3 text-sm flex flex-col gap-1">
+          <span className="font-medium text-sky-800">
+            อัตราค่าบริการ
+            {contract.start_date
+              ? ` ณ ${formatDate(contract.start_date)}`
+              : " ปัจจุบัน"}
+          </span>
+          <div className="flex gap-6 text-gray-700">
+            <span>
+              💧 ค่าน้ำ:{" "}
+              {rates?.water
+                ? `${fmtBaht(rates.water.rate_value)} บาท/หน่วย`
+                : "— ยังไม่ตั้ง"}
+            </span>
+            <span>
+              ⚡ ค่าไฟ:{" "}
+              {rates?.electric
+                ? `${fmtBaht(rates.electric.rate_value)} บาท/หน่วย`
+                : "— ยังไม่ตั้ง"}
+            </span>
+          </div>
+          <span className="text-xs text-sky-700/70">
+            * แสดงเพื่อประกอบการพิจารณา — บิลแต่ละเดือนคิดตามอัตราที่มีผลในเดือนนั้น
+            (สัญญาไม่ได้ผูกกับเรทนี้)
+          </span>
         </div>
 
         <Field label="เงื่อนไขพิเศษ">

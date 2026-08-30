@@ -1,8 +1,20 @@
+import { clearToken, getToken } from "./auth";
+
 // base URL ของ backend — override ได้ด้วย env VITE_API_BASE (ไฟล์ .env)
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
-async function request(path, options) {
-  const res = await fetch(`${API_BASE}${path}`, options);
+async function request(path, options = {}) {
+  const token = getToken();
+  const headers = { ...(options.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  if (res.status === 401) {
+    clearToken();
+    window.dispatchEvent(new Event("auth:logout"));
+  }
+
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -10,34 +22,39 @@ async function request(path, options) {
     } catch {
       /* ไม่ใช่ JSON */
     }
-    // FastAPI ส่ง detail เป็น string หรือ object ก็ได้
-    const msg = typeof detail === "string" ? detail : detail.message ?? "เกิดข้อผิดพลาด";
+    const msg =
+      typeof detail === "string" ? detail : detail.message ?? "เกิดข้อผิดพลาด";
     const err = new Error(`${res.status}: ${msg}`);
     err.status = res.status;
-    err.detail = detail; // object เต็ม (เช่น {message, existing_rate_id})
+    err.detail = detail;
     throw err;
   }
   if (res.status === 204) return null;
   return res.json();
 }
 
+const jsonBody = (method) => (path, body) =>
+  request(path, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
 export const apiGet = (path) => request(path);
-export const apiPost = (path, body) =>
-  request(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-export const apiPut = (path, body) =>
-  request(path, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+export const apiPost = jsonBody("POST");
+export const apiPut = jsonBody("PUT");
+export const apiPatch = jsonBody("PATCH");
 export const apiDelete = (path) => request(path, { method: "DELETE" });
 
-// อัปโหลดไฟล์ 1 ไฟล์ -> { url, filename }
-// อย่าตั้ง header Content-Type เอง ให้ browser ใส่ boundary ให้
+// login: backend ใช้ OAuth2PasswordRequestForm -> ต้องส่งแบบ form-urlencoded
+export const apiLogin = (username, password) =>
+  request("/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ username, password }),
+  });
+
+// อัปโหลดไฟล์ 1 ไฟล์ -> { url, filename } (อย่าตั้ง Content-Type เอง)
 export const apiUpload = (file) => {
   const fd = new FormData();
   fd.append("file", file);

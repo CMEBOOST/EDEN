@@ -26,6 +26,7 @@ app.add_middleware(
 # เสิร์ฟไฟล์อัปโหลด (รูป checklist / เอกสาร) ที่ /uploads
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
+app.include_router(routers.auth_router)
 app.include_router(routers.router)
 app.include_router(routers.upload_router)
 app.include_router(routers.tenant_router)

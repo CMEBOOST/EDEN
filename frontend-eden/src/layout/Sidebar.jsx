@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 
 function Sidebar() {
+  const { user } = useAuth();
   return (
     // เปลี่ยนสีพื้นหลังเป็นสีน้ำเงินเข้ม (bg-[#151f32]) 
     <div className="w-64 bg-[#151f32] text-gray-300 flex flex-col h-screen shrink">
@@ -28,9 +30,11 @@ function Sidebar() {
         <Link to="/rate" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900/50 hover:text-white transition-colors">
           💵 อัตราค่าบริการ
         </Link>
-        <Link to="/permission" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900/50 hover:text-white transition-colors">
-          🔐 จัดการสิทธ์
-        </Link>
+        {user?.role === "admin" && (
+          <Link to="/permission" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900/50 hover:text-white transition-colors">
+            🔐 จัดการสิทธ์
+          </Link>
+        )}
         <Link to="/log" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900/50 hover:text-white transition-colors">
           🪵 Audit Log
         </Link>

@@ -1,8 +1,11 @@
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 # รันในเครื่อง -> ต่อ 127.0.0.1:5433 (ตาม docker-compose ที่ map port ออกมา)
 # รันใน Docker  -> ตั้ง env DATABASE_URL ให้ชี้ไปที่ service "postgres"
