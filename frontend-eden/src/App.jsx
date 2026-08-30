@@ -14,6 +14,7 @@ import Menu from "./pages/Menu";
 import Dashboard from "./modules/dashboard/Dashboard";
 import Contracts from "./modules/contracts/Contracts";
 import ContractForm from "./modules/contracts/ContractForm";
+import CheckoutInspection from "./modules/requests/CheckoutInspection";
 import Tenants from "./modules/tenants/Tenants";
 import Rates from "./modules/rates/Rates";
 import Users from "./modules/users/Users";
@@ -72,6 +73,14 @@ function App() {
               element={
                 <RequireAuth roles={["admin", "staff"]}>
                   <ContractForm />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/contracts/:contractId/checkout"
+              element={
+                <RequireAuth roles={["admin", "staff"]}>
+                  <CheckoutInspection />
                 </RequireAuth>
               }
             />

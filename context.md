@@ -40,13 +40,13 @@ EDEN/
 │   │   ├── database.py        # engine / SessionLocal / get_db / Base (โหลด .env)
 │   │   ├── models/models.py   # ORM models ทั้งหมด (source of truth ของ schema)
 │   │   ├── schemas/schemas.py # Pydantic schemas
-│   │   ├── crud/*_crud.py     # user_crud, tenent_crud, contracts_crud, checklist_crud, document_crud, rate_crud
+│   │   ├── crud/*_crud.py     # user_crud, tenent_crud, contracts_crud, checklist_crud, document_crud, rate_crud, request_crud, dashboard_crud, audit_crud
 │   │   ├── routers/routers.py # ทุก API endpoint (auth_router, router, tenant/contract/rate/... )
 │   │   └── core/
 │   │       ├── security.py    # hash_password / verify_password (bcrypt)
 │   │       ├── auth.py        # JWT: create_access_token, get_current_user, require_roles/require_staff/require_admin
 │   │       └── config.py      # SECRET_KEY ฯลฯ จาก .env
-│   ├── alembic/versions/      # 92c0fb6fb117 (init) → 1dd5441d68a1 (unique rate type+date)
+│   ├── alembic/versions/      # 92c0fb6fb117 (init) → 1dd5441d68a1 (unique rate) → b1c330f21e71 (contract_requests)
 │   ├── alembic.ini · main.py (shim) · Dockerfile / .dockerignore
 │   ├── create_admin.py        # seed admin คนแรก
 │   ├── .env (gitignore) / .env.example
@@ -65,8 +65,10 @@ EDEN/
 │   │       ├── users/     Users.jsx (จัดการสิทธิ์ /permission — admin), UserForm.jsx
 │   │       ├── audit/     AuditLog.jsx (/log — admin, filter user + ค้นหา + โหลดเพิ่ม)
 │   │       ├── tenants/   Tenants.jsx (list+CRUD), TenantForm.jsx
-│   │       ├── contracts/ Contracts.jsx (list+แก้/ลบ), ContractForm.jsx (/contracts/new — 3 ส่วน),
-│   │       │              ContractEditForm.jsx, ChecklistEditor.jsx, DocumentUploader.jsx
+│   │       ├── contracts/ Contracts.jsx (list+แก้/ลบ + <RequestPanel>), ContractForm.jsx (/contracts/new — 3 ส่วน),
+│   │       │              ContractEditForm.jsx, ChecklistEditor.jsx (prop showCost), DocumentUploader.jsx
+│   │       ├── requests/  คำแจ้งความจำนง — IntentNoticeDialog (tenant), RequestPanel/RenewDialog/RejectDialog (staff),
+│   │       │              CheckoutInspection.jsx (หน้า /contracts/:id/checkout), requestMeta.js
 │   │       └── rates/     Rates.jsx (list+CRUD ค่าน้ำ/ค่าไฟ), RateForm.jsx
 │   ├── Dockerfile
 │   └── package.json / vite.config.js
@@ -94,6 +96,7 @@ Source of truth = [backend-eden/app/models/models.py](backend-eden/app/models/mo
 | `tenant_documents` | doc_id | doc_type, file_url | tenant_id → tenants, uploaded_by → users |
 | `contracts` | contract_id | start/end_date, rent, security_deposit, status, room_id* | tenant_id → tenants, created_by → users |
 | `contract_checklists` | cc_id | type (check-in/out), checklist_items (JSON), photo_urls (JSON), tenant_signature | contract_id → contracts, created_by → users |
+| `contract_requests` | request_id | request_type (renew/terminate), status, tenant_note, preferred_date, staff_note, damage_total, handled_at | contract_id → contracts, created_by / handled_by → users |
 | `rate_configs` | rate_id | type (water/electric), rate_value, effective_date · **UNIQUE(type, effective_date)** | created_by → users |
 | `audit_logs` | log_id | action, created_at | user_id → users |
 
@@ -104,9 +107,10 @@ Source of truth = [backend-eden/app/models/models.py](backend-eden/app/models/mo
 - `contract_status_enum`: draft / active / expired / terminated
 - `checklist_type_enum`: check-in / check-out
 - `rate_type_enum`: water / electric
+- `request_type_enum`: renew / terminate · `request_status_enum`: pending / accepted / rejected / completed
 
 **ความสัมพันธ์หลัก:** `users` 1─N แทบทุกตาราง (ในฐานะผู้สร้าง/ผู้อัปโหลด),
-`tenants` 1─N `tenant_documents` / `contracts`, `contracts` 1─N `contract_checklists`
+`tenants` 1─N `tenant_documents` / `contracts`, `contracts` 1─N `contract_checklists` / `contract_requests`
 
 ---
 
@@ -130,18 +134,21 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | DELETE | `/documents/{doc_id}` | ลบเอกสาร |
 | POST/GET | `/contracts/` | สร้าง / list (query `tenant_id`) · create เช็ค tenant + วันที่ |
 | GET/PUT/DELETE | `/contracts/{id}` | อ่าน / แก้ (`ContractUpdate`) / ลบ |
-| POST/GET | `/contracts/{id}/checklists` | บันทึกสภาพห้อง — `{type, items:[{name,status,note,photos}], tenant_signature?}` → เก็บ `checklist_items` (JSON) + `photo_urls` (flat) |
+| POST/GET | `/contracts/{id}/checklists` | บันทึกสภาพห้อง — `{type: check-in\|check-out, items:[{name,status,note,photos,cost}], tenant_signature?}` → เก็บ `checklist_items` (JSON) + `photo_urls` (flat) · `cost` = ค่าเสียหายรายรายการ (ใช้ตอน check-out) |
+| POST/GET | `/contract-requests/` | คำแจ้งความจำนง — POST `{contract_id, request_type: renew\|terminate, tenant_note, preferred_date?}` (tenant = สัญญาตัวเอง, ซ้ำ→409) · GET tenant เห็นของตัวเอง / staff+ เห็นหมด (query `status`) |
+| GET/PATCH | `/contract-requests/{id}` | GET (tenant เจ้าของ/staff+) · PATCH (staff+) `{status, staff_note, preferred_date, damage_total}` — completed+terminate ต้องมี checklist check-out ก่อน (400) |
 | POST/GET | `/rates/` | อัตราค่าน้ำ/ค่าไฟ (`{type: water\|electric, rate_value, effective_date}`) · query `type` · POST ชน `(type, effective_date)` เดิม → **409** `{message, existing_rate_id}` |
 | GET | `/rates/current` | อัตราที่มีผล ณ วันนี้ (หรือ `?date=`) → `{water: {...}\|null, electric: {...}\|null}` |
 | GET/PUT/DELETE | `/rates/{rate_id}` | อ่าน / แก้ (`RateConfigUpdate`, PUT เข้า slot ที่มีแล้ว → 409) / ลบ |
 | GET | `/audit-logs/` | **admin เท่านั้น** — query `skip`,`limit`,`user_id`,`q` (ค้นข้อความ action) |
-| GET | `/dashboard/` | ข้อมูลแตกตาม role — admin: `counts`+`expiring`+`monthly_rent_total` · staff: ไม่มี rent_total · tenant: `{tenant, contract, documents, rates}` ของตัวเอง |
+| GET | `/dashboard/` | ข้อมูลแตกตาม role — admin: `counts`(+`requests_pending`)+`expiring`+`monthly_rent_total` · staff: ไม่มี rent_total · tenant: `{tenant, contract, documents, request, rates}` ของตัวเอง |
 
 **Auth / RBAC** (ตาม Permission Matrix v1.0):
 - ทุก endpoint (ยกเว้น `/auth/login`) ต้องมี `Authorization: Bearer <JWT>`
 - **admin เท่านั้น**: `/users/*`, `/audit-logs/`, `/rates/` (create/update/delete), `DELETE /tenants|/contracts`, ยุติสัญญา (PUT contract `status=terminated`)
-- **staff+**: `/tenants/*`, `/contracts/*` (ทั้ง router), `GET /rates/`, POST/PUT อื่น ๆ
-- **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/rates/current` — เข้า `/tenants` `/contracts` `/rates` list → 403
+- **staff+**: `/tenants/*`, `/contracts/*` (ทั้ง router), `GET /rates/`, `PATCH /contract-requests/{id}` (รับเรื่อง/ปฏิเสธ/ปิดงาน), POST/PUT อื่น ๆ
+- **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/rates/current`, `/contract-requests/` (POST+GET เฉพาะสัญญาตัวเอง) — เข้า `/tenants` `/contracts` `/rates` list → 403
+- **ต่อสัญญา** = `PUT /contracts/{id}` `{end_date}` (staff+) · **ตรวจสภาพห้องออก** = `POST .../checklists` `{type:check-out}` (staff+) · ตั้ง `terminated` = admin เท่านั้น (staff ตรวจได้ แต่ยุติไม่ได้)
 - `DELETE /tenants/{id}` = **soft delete** (ปิด `is_active` ของ user ที่ผูก, ข้อมูลไม่หาย)
 - `/uploads/<file>` (static) ยังเปิดอ่านได้ไม่ต้อง token (dev)
 
@@ -229,6 +236,7 @@ npm run dev
 - [x] auth เต็ม — ทุก endpoint ต้องล็อกอิน, write = staff+, จัดการสิทธิ์ + audit = admin
 - [x] `UserOut` (ไม่มี password_hash) · secret ไป `.env`
 - [x] audit log — middleware บันทึกทุก write อัตโนมัติ
+- [x] คำแจ้งความจำนง (UC3.8 ต่อสัญญา / ยุติสัญญา) — `contract_requests` + `/contract-requests/*` · ต่อ = ขยาย end_date · ยุติ = ตรวจห้องออก (`ChecklistItem.cost`) + คิดเงินคืน
 - [ ] เก็บ `created_by`/`uploaded_by` จาก current user (ตอนนี้ frontend ยังไม่ส่ง)
 - [ ] response schema แยกสำหรับ tenants (`/tenants/` ยังคืน `national_id_encrypted`)
 - [ ] ตาราง `rooms` + ผูก FK `contracts.room_id`
@@ -242,6 +250,7 @@ npm run dev
 - [x] Dashboard หน้า `/` แตกตาม role (admin KPI+รายได้, staff KPI, tenant สัญญา+เอกสารตัวเอง)
 - [x] RBAC frontend — เมนู/route จำกัดตาม role, ซ่อนปุ่มลบ/ยุติสัญญาสำหรับ non-admin
 - [x] ต่อ API จริง (`lib/api.js`), หน้า Tenants / Contracts / Rates (list + เพิ่ม/แก้/ลบ), ContractForm
+- [x] คำแจ้งความจำนง — tenant กดจาก Dashboard · staff เห็น RequestPanel บน `/contracts` · หน้าตรวจห้องออก `/contracts/:id/checkout`
 - [ ] tenant portal เต็ม: แก้ข้อมูลตัวเอง (UC2.5), เปลี่ยนรหัสผ่าน (UC6.2)
 - [ ] หน้า contract detail (ดู/แก้ checklist + เอกสารของสัญญา)
 - [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)

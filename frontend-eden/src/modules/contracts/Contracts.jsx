@@ -5,6 +5,7 @@ import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ContractEditForm from "./ContractEditForm";
+import RequestPanel from "../requests/RequestPanel";
 
 // status ตรงกับ contract_status_enum ใน backend
 const statusStyle = {
@@ -33,6 +34,8 @@ function Contracts() {
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [tick, setTick] = useState(0);
+  const reload = () => setTick((t) => t + 1);
 
   const upsertContract = (saved) =>
     setContracts((prev) =>
@@ -81,7 +84,7 @@ function Contracts() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [tick]);
 
   const tenantName = (id) => tenantsById[id]?.full_name ?? `#${id}`;
 
@@ -114,6 +117,8 @@ function Contracts() {
           </button>
         </div>
       </div>
+
+      <RequestPanel onActioned={reload} />
 
       <div className="bg-gray-50 flex p-2 justify-start items-center rounded">
         <input

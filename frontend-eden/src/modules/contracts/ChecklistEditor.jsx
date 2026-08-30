@@ -6,15 +6,19 @@ const STATUS_OPTIONS = ["ปกติ", "ชำรุด", "ต้องซ่�
 const baseCls =
   "border border-gray-300 rounded px-2 py-1.5 text-sm outline-none focus:border-blue-500";
 
-// value = [{name, status, note, photos:[url]}], onChange(newValue)
-function ChecklistEditor({ value, onChange }) {
+// value = [{name, status, note, photos:[url], cost?}], onChange(newValue)
+// showCost = true -> เพิ่มช่องค่าเสียหายต่อรายการ (ใช้ตอนตรวจสภาพห้องออก)
+function ChecklistEditor({ value, onChange, showCost = false }) {
   const [uploadingRow, setUploadingRow] = useState(null);
 
   const update = (i, patch) =>
     onChange(value.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
   const addRow = () =>
-    onChange([...value, { name: "", status: "ปกติ", note: "", photos: [] }]);
+    onChange([
+      ...value,
+      { name: "", status: "ปกติ", note: "", photos: [], cost: 0 },
+    ]);
 
   const removeRow = (i) => onChange(value.filter((_, idx) => idx !== i));
 
@@ -74,12 +78,29 @@ function ChecklistEditor({ value, onChange }) {
             </button>
           </div>
 
-          <input
-            placeholder="หมายเหตุ"
-            value={row.note ?? ""}
-            onChange={(e) => update(i, { note: e.target.value })}
-            className={`${baseCls} w-full`}
-          />
+          <div className="flex gap-2">
+            <input
+              placeholder="หมายเหตุ"
+              value={row.note ?? ""}
+              onChange={(e) => update(i, { note: e.target.value })}
+              className={`${baseCls} flex-1 min-w-0`}
+            />
+            {showCost && (
+              <div className="flex items-center gap-1 shrink-0">
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="ค่าเสียหาย"
+                  value={row.cost ?? 0}
+                  onChange={(e) =>
+                    update(i, { cost: Number(e.target.value) || 0 })
+                  }
+                  className={`${baseCls} w-28`}
+                />
+                <span className="text-xs text-gray-400">฿</span>
+              </div>
+            )}
+          </div>
 
           <div className="flex flex-wrap items-center gap-2">
             {row.photos.map((url) => (

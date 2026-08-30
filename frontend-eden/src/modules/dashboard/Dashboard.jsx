@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiGet, fileUrl } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
+import IntentNoticeDialog from "../requests/IntentNoticeDialog";
+import { statusLabel, statusStyle, typeLabel, OPEN_STATUSES } from "../requests/requestMeta";
 
 const fmtBaht = (n) =>
   Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -32,6 +34,11 @@ function StaffAdminDashboard({ data }) {
         <StatCard label="ผู้เช่าทั้งหมด" value={counts.tenants} />
         <StatCard label="สัญญาที่ใช้งาน" value={counts.contracts_active} />
         <StatCard label="สัญญาร่าง" value={counts.contracts_draft} />
+        <StatCard
+          label="คำขอรอดำเนินการ"
+          value={counts.requests_pending ?? 0}
+          hint="ต่อ/ยุติสัญญา — ดูที่หน้าสัญญาเช่า"
+        />
         {monthly_rent_total !== undefined && (
           <StatCard
             label="รายได้ค่าเช่า/เดือน"
@@ -87,8 +94,40 @@ function StaffAdminDashboard({ data }) {
   );
 }
 
-function TenantDashboard({ data }) {
-  const { tenant, contract, documents, rates } = data;
+function RequestStatusBox({ request }) {
+  const open = OPEN_STATUSES.includes(request.status);
+  return (
+    <div
+      className={`rounded-lg p-3 text-sm flex flex-col gap-1 ${
+        open ? "bg-amber-50" : "bg-gray-50"
+      }`}
+    >
+      <span className="flex items-center gap-2">
+        <span className="text-gray-600">คำแจ้งความจำนง:</span>
+        <span className="font-medium">{typeLabel[request.request_type]}</span>
+        <span
+          className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+            statusStyle[request.status]
+          }`}
+        >
+          {statusLabel[request.status]}
+        </span>
+      </span>
+      {request.staff_note && (
+        <span className="text-gray-500">หมายเหตุ: {request.staff_note}</span>
+      )}
+    </div>
+  );
+}
+
+function TenantDashboard({ data, onReload }) {
+  const { tenant, contract, documents, rates, request } = data;
+  const [showNotice, setShowNotice] = useState(false);
+  const canNotify =
+    contract &&
+    contract.status === "active" &&
+    !(request && OPEN_STATUSES.includes(request.status));
+
   return (
     <div className="flex flex-col gap-5 font-sans max-w-2xl">
       <h2 className="text-3xl">สวัสดี, {tenant?.full_name ?? "ผู้เช่า"}</h2>
@@ -128,11 +167,31 @@ function TenantDashboard({ data }) {
               📄 ดาวน์โหลดสัญญา
             </a>
           )}
+
+          {request && <RequestStatusBox request={request} />}
+
+          {canNotify && (
+            <button
+              type="button"
+              onClick={() => setShowNotice(true)}
+              className="self-start px-3 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
+            >
+              แจ้งความจำนงล่วงหน้า (ต่อ/ยุติสัญญา)
+            </button>
+          )}
         </div>
       ) : (
         <div className="border border-gray-200 rounded-xl p-5 text-gray-500">
           ยังไม่มีข้อมูลสัญญา — ติดต่อเจ้าหน้าที่หอพัก
         </div>
+      )}
+
+      {showNotice && (
+        <IntentNoticeDialog
+          contractId={contract.contract_id}
+          onClose={() => setShowNotice(false)}
+          onDone={onReload}
+        />
       )}
 
       <div className="border border-gray-200 rounded-xl p-5 flex flex-col gap-2">
@@ -174,11 +233,15 @@ function Dashboard() {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
     apiGet("/dashboard/")
       .then(setData)
       .catch((e) => setError(e.message));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   if (error)
     return <div className="p-6 text-red-600 font-sans">โหลดข้อมูลไม่สำเร็จ: {error}</div>;
@@ -186,7 +249,7 @@ function Dashboard() {
     return <div className="p-6 text-gray-400 font-sans">กำลังโหลด...</div>;
 
   return user?.role === "tenant" ? (
-    <TenantDashboard data={data} />
+    <TenantDashboard data={data} onReload={load} />
   ) : (
     <StaffAdminDashboard data={data} />
   );

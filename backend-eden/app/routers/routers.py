@@ -498,6 +498,7 @@ def dashboard_route(
             "tenant": home["tenant"],
             "contract": home["contract"],
             "documents": home["documents"],
+            "request": home["request"],
             "rates": {
                 t.value: rate_crud.get_effective_rate(db, t.value, today)
                 for t in RateType
