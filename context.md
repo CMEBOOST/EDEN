@@ -195,11 +195,13 @@ npm run dev
   - `alembic/env.py` ใช้ URL เดียวกันนี้ (override `sqlalchemy.url` ใน `alembic.ini`)
 - **CORS**: `app/main.py` อนุญาตเฉพาะ `http://localhost:5173`
 - **`SECRET_KEY`** (เซ็น JWT) + `ACCESS_TOKEN_EXPIRE_MINUTES` อยู่ใน `backend-eden/.env` (gitignore) — `config.py` โหลดให้ · ดู `.env.example`
+  - ใน Docker: compose ฉีดเข้าผ่าน `env_file: ./backend-eden/.env` (`required: false`) — ไม่ถูกฝังใน image (`.env` อยู่ใน `.dockerignore`)
 - **สร้าง admin คนแรก:** `cd backend-eden && uv run python create_admin.py <user> <pass>` (มี `admin` / `admin123` อยู่แล้วสำหรับ dev)
 - DB password ยัง hard-code `admin123` ใน compose — dev only
 - data volume: **named volumes** `eden_postgres-data`, `eden_pgadmin-data` (Docker จัดการเอง)
   - อยู่รอด `docker compose down` — ลบเฉพาะ `docker compose down -v` หรือ `docker volume rm`
   - โฟลเดอร์ `postgres-data/` `pgadmin-data/` ที่ root เป็นของเก่า (สมัย bind mount) เลิกใช้แล้ว ลบทิ้งได้
+- ไฟล์อัปโหลด: bind mount `./backend-eden/uploads:/app/uploads` (นอก image, เห็นบน host) — prod ควรเปลี่ยนเป็น named volume
 
 ---
 
@@ -241,8 +243,11 @@ npm run dev
 - [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)
 
 **Infra**
-- [ ] frontend service ใน compose ยังไม่ได้อยู่ใน `eden-network` และยังไม่ได้ตั้ง URL ของ backend
-- [ ] production Dockerfile (ตอนนี้ dev mode: `uvicorn --reload`, `npm run dev`)
+- [x] frontend service อยู่ใน `eden-network` + `container_name` + `depends_on: backend`
+- [x] `SECRET_KEY` ไม่ถูกฝังใน image · uploads อยู่นอก image · `npm ci` แทน `npm install`
+- [ ] ตั้ง `VITE_API_BASE` ตอน build (ตอนนี้ frontend เรียก `http://localhost:8000` ตายตัว)
+- [ ] production Dockerfile (ตอนนี้ dev mode: `uvicorn --reload`, `npm run dev`) — frontend build → nginx, backend `--workers`, migration แยกเป็น one-shot
+- [ ] pin image เวอร์ชัน (`pgadmin4:latest`, `uv:latest`), healthcheck backend, root `.env` สำหรับ compose (`admin123` hard-code), CI, backup Postgres
 
 ---
 

@@ -4,11 +4,11 @@ FROM node:20-alpine
 # ตั้งค่า Working Directory ใน Container
 WORKDIR /app
 
-# ก๊อปปี้ไฟล์ package.json และ package-lock.json (ถ้ามี) เข้าไปก่อน
+# ก๊อปปี้ไฟล์ package.json และ package-lock.json เข้าไปก่อน (แยก layer ไว้ใช้ cache)
 COPY package*.json ./
 
-# ติดตั้ง Dependencies
-RUN npm install
+# ติดตั้ง Dependencies แบบตรงตาม lock file (reproducible)
+RUN npm ci
 
 # ก๊อปปี้ไฟล์ทั้งหมดในโปรเจกต์เข้าไป
 COPY . .

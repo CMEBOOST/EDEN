@@ -50,9 +50,14 @@ services:
     environment:
       # ต่อ DB ผ่านชื่อ service ภายใน network (พอร์ตภายในคือ 5432)
       DATABASE_URL: postgresql://postgres:admin123@postgres:5432/EDEN_DB
+    # คีย์ลับ (SECRET_KEY ฯลฯ) อ่านจากไฟล์ตอน compose up — ไม่ถูกฝังใน image
+    env_file:
+      - path: ./backend-eden/.env
+        required: false
     volumes:
-      - ./backend-eden:/app     # map โค้ดเข้าไป (hot reload ผ่าน --reload ได้)
-      - /app/.venv              # กัน .venv ในเครื่องไปทับของใน container
+      - ./backend-eden:/app             # map โค้ดเข้าไป (hot reload ผ่าน --reload ได้)
+      - /app/.venv                      # กัน .venv ในเครื่องไปทับของใน container
+      - ./backend-eden/uploads:/app/uploads  # ไฟล์อัปโหลดอยู่นอก image (prod: เปลี่ยนเป็น named volume)
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,6 +66,8 @@ services:
 
   frontend:
     build: ./frontend-eden
+    container_name: eden-frontend
+    restart: unless-stopped
     ports:
       - "5173:5173"
     volumes:
@@ -68,6 +75,10 @@ services:
       - /app/node_modules    # ป้องกันไม่ให้ node_modules ในเครื่องไปทับใน Container
     environment:
       - CHOKIDAR_USEPOLLING=true # ช่วยให้ Hot Reload ทำงานได้ดีขึ้นบนบาง OS (เช่น Windows WSL)
+    depends_on:
+      - backend
+    networks:
+      - eden-network
 
 networks:
   eden-network:
