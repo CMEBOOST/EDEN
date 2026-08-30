@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# ติดตั้ง uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+# ติดตั้ง uv (pin เวอร์ชันให้ build ซ้ำได้เหมือนเดิม)
+COPY --from=ghcr.io/astral-sh/uv:0.12.7 /uv /uvx /bin/
 
 WORKDIR /app
 

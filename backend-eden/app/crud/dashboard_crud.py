@@ -20,7 +20,18 @@ def counts(db: Session) -> dict:
         .scalar()
         or 0
     )
-    return {"tenants": tenants, "contracts_active": active, "contracts_draft": draft}
+    requests_pending = (
+        db.query(func.count(models.ContractRequest.request_id))
+        .filter(models.ContractRequest.status == "pending")
+        .scalar()
+        or 0
+    )
+    return {
+        "tenants": tenants,
+        "contracts_active": active,
+        "contracts_draft": draft,
+        "requests_pending": requests_pending,
+    }
 
 
 def expiring_contracts(db: Session, days: int = 30) -> list[dict]:
@@ -64,7 +75,7 @@ def tenant_home(db: Session, user_id: int) -> dict:
         .first()
     )
     if tenant is None:
-        return {"tenant": None, "contract": None, "documents": []}
+        return {"tenant": None, "contract": None, "documents": [], "request": None}
 
     contract = (
         db.query(models.Contracts)
@@ -77,4 +88,19 @@ def tenant_home(db: Session, user_id: int) -> dict:
         .filter(models.TenantDocument.tenant_id == tenant.tenant_id)
         .all()
     )
-    return {"tenant": tenant, "contract": contract, "documents": documents}
+    request = (
+        db.query(models.ContractRequest)
+        .join(
+            models.Contracts,
+            models.ContractRequest.contract_id == models.Contracts.contract_id,
+        )
+        .filter(models.Contracts.tenant_id == tenant.tenant_id)
+        .order_by(models.ContractRequest.created_at.desc())
+        .first()
+    )
+    return {
+        "tenant": tenant,
+        "contract": contract,
+        "documents": documents,
+        "request": request,
+    }

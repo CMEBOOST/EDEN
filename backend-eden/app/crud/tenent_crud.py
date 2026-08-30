@@ -32,6 +32,14 @@ def get_tenant(db: Session, tenant_id: int):
     )
 
 
+def get_tenant_by_user(db: Session, user_id: int):
+    return (
+        db.query(models.Tenants)
+        .filter(models.Tenants.user_id == user_id)
+        .first()
+    )
+
+
 def update_tenant(db: Session, tenant_id: int, data: schemas.TenantUpdate):
     tenant = get_tenant(db, tenant_id)
     if tenant is None:

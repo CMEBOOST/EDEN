@@ -57,6 +57,18 @@ class RateType(str, enum.Enum):
     electric = "electric"
 
 
+class RequestType(str, enum.Enum):
+    renew = "renew"
+    terminate = "terminate"
+
+
+class RequestStatus(str, enum.Enum):
+    pending = "pending"      # ผู้เช่าแจ้ง ยังไม่มีใครรับเรื่อง
+    accepted = "accepted"    # staff/admin รับเรื่อง กำลังดำเนินการ
+    rejected = "rejected"
+    completed = "completed"  # ต่อสัญญาแล้ว / ตรวจสภาพห้องออกเสร็จ
+
+
 # ---------------------------------------------------------------------------
 # Mixin: created_at / updated_at ให้ทุกตารางเหมือนกัน
 # ---------------------------------------------------------------------------
@@ -163,6 +175,7 @@ class Contracts(TimestampMixin, Base):
     created_by_user: Mapped["Users | None"] = relationship(back_populates="contracts_created")
 
     contract_checklists: Mapped[list["ContractChecklist"]] = relationship(back_populates="contract")
+    contract_requests: Mapped[list["ContractRequest"]] = relationship(back_populates="contract")
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +196,37 @@ class ContractChecklist(TimestampMixin, Base):
 
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
     created_by_user: Mapped["Users | None"] = relationship(back_populates="checklists_created")
+
+
+# ---------------------------------------------------------------------------
+# Contract requests — คำแจ้งความจำนงล่วงหน้า (ต่อสัญญา / ยุติสัญญา)
+# ---------------------------------------------------------------------------
+class ContractRequest(TimestampMixin, Base):
+    __tablename__ = "contract_requests"
+
+    request_id: Mapped[int] = mapped_column(primary_key=True, index=True)
+
+    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.contract_id"), index=True)
+    contract: Mapped["Contracts"] = relationship(back_populates="contract_requests")
+
+    request_type: Mapped[RequestType] = mapped_column(_enum_col(RequestType, "request_type_enum"))
+    status: Mapped[RequestStatus] = mapped_column(
+        _enum_col(RequestStatus, "request_status_enum"),
+        default=RequestStatus.pending,
+    )
+
+    tenant_note: Mapped[str] = mapped_column(Text)
+    # วันสิ้นสุดใหม่ (ต่อสัญญา) หรือ วันย้ายออกที่เสนอ (ยุติสัญญา)
+    preferred_date: Mapped[datetime.date | None] = mapped_column(Date)
+    staff_note: Mapped[str | None] = mapped_column(Text)
+    damage_total: Mapped[float | None] = mapped_column(Numeric(10, 2))
+
+    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
+    handled_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
+    handled_at: Mapped[datetime.datetime | None] = mapped_column(Timestamp)
+
+    created_by_user: Mapped["Users | None"] = relationship(foreign_keys=[created_by])
+    handled_by_user: Mapped["Users | None"] = relationship(foreign_keys=[handled_by])
 
 
 # ---------------------------------------------------------------------------

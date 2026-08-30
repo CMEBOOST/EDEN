@@ -2,7 +2,14 @@ import datetime
 
 from pydantic import BaseModel
 
-from ..models.models import ChecklistType, ContractStatus, RateType, Role
+from ..models.models import (
+    ChecklistType,
+    ContractStatus,
+    RateType,
+    RequestStatus,
+    RequestType,
+    Role,
+)
 
 
 class User(BaseModel):
@@ -103,6 +110,7 @@ class ChecklistItem(BaseModel):
     status: str = "ปกติ"
     note: str | None = None
     photos: list[str] = []
+    cost: float = 0  # ค่าเสียหายรายรายการ (ใช้ตอนตรวจสภาพห้องออก)
 
 
 class ChecklistCreate(BaseModel):
@@ -110,6 +118,21 @@ class ChecklistCreate(BaseModel):
     items: list[ChecklistItem] = []
     tenant_signature: str | None = None
     created_by: int | None = None
+
+
+class ContractRequestCreate(BaseModel):
+    contract_id: int
+    request_type: RequestType
+    tenant_note: str
+    preferred_date: datetime.date | None = None
+
+
+class ContractRequestUpdate(BaseModel):
+    """สำหรับ PATCH — ส่งมาเฉพาะ field ที่อยากแก้"""
+    status: RequestStatus | None = None
+    staff_note: str | None = None
+    preferred_date: datetime.date | None = None
+    damage_total: float | None = None
 
 
 class RateConfig(BaseModel):

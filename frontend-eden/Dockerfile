@@ -1,5 +1,5 @@
-# ใช้ Node.js เวอร์ชัน 20 บน Alpine Linux เพื่อให้ไฟล์มีขนาดเล็ก
-FROM node:20-alpine
+# ใช้ Node.js เวอร์ชัน 20 บน Alpine Linux เพื่อให้ไฟล์มีขนาดเล็ก (pin minor)
+FROM node:20.20-alpine
 
 # ตั้งค่า Working Directory ใน Container
 WORKDIR /app

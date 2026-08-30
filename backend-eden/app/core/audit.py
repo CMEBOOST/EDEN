@@ -32,6 +32,11 @@ def describe(method: str, path: str) -> str:
         return f"เพิ่มเอกสารของผู้เช่า #{parts[1]}"
     if len(parts) >= 3 and parts[0] == "contracts" and parts[2] == "checklists":
         return f"บันทึกสภาพห้อง สัญญา #{parts[1]}"
+    if parts[0] == "contract-requests":
+        if method == "POST":
+            return "แจ้งความจำนง (ต่อ/ยุติสัญญา)"
+        if len(parts) >= 2 and parts[1].isdigit():
+            return f"ดำเนินการคำแจ้งความจำนง #{parts[1]}"
 
     entity = _ENTITY.get(parts[0], parts[0])
     if len(parts) >= 2 and parts[1].isdigit():

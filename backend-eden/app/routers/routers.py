@@ -19,12 +19,13 @@ from ..crud import (
     dashboard_crud,
     document_crud,
     rate_crud,
+    request_crud,
     tenent_crud,
     user_crud,
 )
 from ..database import get_db
 from ..models import models
-from ..models.models import ContractStatus, RateType
+from ..models.models import ChecklistType, ContractStatus, RateType, RequestStatus
 from ..schemas import schemas
 
 # ทุก router (ยกเว้น auth) ต้องล็อกอินก่อน · write = staff+ · ตั้งค่าระบบ = admin
@@ -376,6 +377,105 @@ def list_audit_logs_route(
     db: Session = Depends(get_db),
 ):
     return audit_crud.get_logs(db, skip=skip, limit=limit, user_id=user_id, q=q)
+
+
+# ---------------------------------------------------------------------------
+# Contract requests — คำแจ้งความจำนงล่วงหน้า (ต่อสัญญา / ยุติสัญญา)
+# ---------------------------------------------------------------------------
+request_router = APIRouter(
+    prefix="/contract-requests", tags=["Contract Requests"], dependencies=_auth
+)
+
+
+def _role(user: models.Users) -> str:
+    return user.role.value if hasattr(user.role, "value") else user.role
+
+
+@request_router.post("/")
+def create_request_route(
+    data: schemas.ContractRequestCreate,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(get_current_user),
+):
+    contract = contracts_crud.get_contract(db=db, contract_id=data.contract_id)
+    if contract is None:
+        raise HTTPException(status_code=404, detail="ไม่พบสัญญา")
+
+    if _role(me) == "tenant":
+        tenant = tenent_crud.get_tenant_by_user(db=db, user_id=me.user_id)
+        if tenant is None or contract.tenant_id != tenant.tenant_id:
+            raise HTTPException(
+                status_code=403, detail="แจ้งความจำนงได้เฉพาะสัญญาของตัวเอง"
+            )
+
+    if request_crud.has_open_request(db=db, contract_id=data.contract_id) is not None:
+        raise HTTPException(
+            status_code=409, detail="มีคำแจ้งความจำนงที่ยังไม่ดำเนินการอยู่แล้ว"
+        )
+
+    return request_crud.create_request(db=db, data=data, created_by=me.user_id)
+
+
+@request_router.get("/")
+def list_requests_route(
+    status: str | None = None,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(get_current_user),
+):
+    if _role(me) == "tenant":
+        tenant = tenent_crud.get_tenant_by_user(db=db, user_id=me.user_id)
+        if tenant is None:
+            return []
+        return request_crud.get_requests(
+            db=db, status=status, tenant_id=tenant.tenant_id
+        )
+    return request_crud.get_requests(db=db, status=status)
+
+
+@request_router.get("/{request_id}")
+def get_request_route(
+    request_id: int,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(get_current_user),
+):
+    row = request_crud.get_request_row(db=db, request_id=request_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="ไม่พบคำแจ้งความจำนง")
+
+    if _role(me) == "tenant":
+        tenant = tenent_crud.get_tenant_by_user(db=db, user_id=me.user_id)
+        contract = contracts_crud.get_contract(db=db, contract_id=row["contract_id"])
+        if tenant is None or contract is None or contract.tenant_id != tenant.tenant_id:
+            raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์ดูคำขอนี้")
+
+    return row
+
+
+@request_router.patch("/{request_id}", dependencies=_staff)
+def update_request_route(
+    request_id: int,
+    data: schemas.ContractRequestUpdate,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(require_staff),
+):
+    req = request_crud.get_request(db=db, request_id=request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail="ไม่พบคำแจ้งความจำนง")
+
+    # ปิดงานยุติสัญญา ต้องบันทึกผลตรวจสภาพห้องออกก่อน
+    if (
+        data.status == RequestStatus.completed
+        and req.request_type == models.RequestType.terminate
+    ):
+        checklists = checklist_crud.get_checklists(db=db, contract_id=req.contract_id)
+        if not any(c.type == ChecklistType.check_out for c in checklists):
+            raise HTTPException(
+                status_code=400, detail="ต้องบันทึกผลตรวจสภาพห้องออกก่อน"
+            )
+
+    return request_crud.update_request(
+        db=db, request_id=request_id, data=data, handled_by=me.user_id
+    )
 
 
 # ---------------------------------------------------------------------------

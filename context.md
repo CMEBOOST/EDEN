@@ -155,8 +155,12 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 
 ### Docker (ทั้ง stack)
 ```bash
+cp .env.example .env        # (ครั้งแรก) ปรับ port / password ได้ — ถ้าไม่มีก็ใช้ default
 docker compose up -d --build
 ```
+> พอร์ต/รหัสผ่านทั้งหมดปรับผ่าน `.env` ที่ root (ดู `.env.example`) · `SECRET_KEY` อยู่ `backend-eden/.env` แยกต่างหาก
+> images pin เวอร์ชันแล้ว (`postgres:16.15`, `dpage/pgadmin4:9.17`, `uv:0.12.7`, `node:20.20-alpine`)
+> `backend` มี healthcheck (`GET /`) · `frontend` รอ backend healthy ก่อนขึ้น
 | service | URL |
 |---|---|
 | backend | http://localhost:8000/docs |
@@ -197,7 +201,7 @@ npm run dev
 - **`SECRET_KEY`** (เซ็น JWT) + `ACCESS_TOKEN_EXPIRE_MINUTES` อยู่ใน `backend-eden/.env` (gitignore) — `config.py` โหลดให้ · ดู `.env.example`
   - ใน Docker: compose ฉีดเข้าผ่าน `env_file: ./backend-eden/.env` (`required: false`) — ไม่ถูกฝังใน image (`.env` อยู่ใน `.dockerignore`)
 - **สร้าง admin คนแรก:** `cd backend-eden && uv run python create_admin.py <user> <pass>` (มี `admin` / `admin123` อยู่แล้วสำหรับ dev)
-- DB password ยัง hard-code `admin123` ใน compose — dev only
+- DB password / พอร์ต ปรับผ่าน `.env` ที่ root (`POSTGRES_PASSWORD`, `*_PORT` ฯลฯ) — มี default `admin123` สำหรับ dev
 - data volume: **named volumes** `eden_postgres-data`, `eden_pgadmin-data` (Docker จัดการเอง)
   - อยู่รอด `docker compose down` — ลบเฉพาะ `docker compose down -v` หรือ `docker volume rm`
   - โฟลเดอร์ `postgres-data/` `pgadmin-data/` ที่ root เป็นของเก่า (สมัย bind mount) เลิกใช้แล้ว ลบทิ้งได้
@@ -243,11 +247,13 @@ npm run dev
 - [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)
 
 **Infra**
-- [x] frontend service อยู่ใน `eden-network` + `container_name` + `depends_on: backend`
+- [x] frontend service อยู่ใน `eden-network` + `container_name` + `depends_on: backend (healthy)`
 - [x] `SECRET_KEY` ไม่ถูกฝังใน image · uploads อยู่นอก image · `npm ci` แทน `npm install`
+- [x] pin image เวอร์ชันทุกตัว · healthcheck backend · root `.env` สำหรับ compose (port/password)
+- [x] CI — `.github/workflows/ci.yml` (backend: pyright + alembic upgrade · frontend: eslint + vite build)
 - [ ] ตั้ง `VITE_API_BASE` ตอน build (ตอนนี้ frontend เรียก `http://localhost:8000` ตายตัว)
 - [ ] production Dockerfile (ตอนนี้ dev mode: `uvicorn --reload`, `npm run dev`) — frontend build → nginx, backend `--workers`, migration แยกเป็น one-shot
-- [ ] pin image เวอร์ชัน (`pgadmin4:latest`, `uv:latest`), healthcheck backend, root `.env` สำหรับ compose (`admin123` hard-code), CI, backup Postgres
+- [ ] backup Postgres (pg_dump cron) · แยก pgadmin เป็น compose profile
 
 ---
 
@@ -257,3 +263,4 @@ npm run dev
 - Alembic migration มีอันเดียว (init) และถูก regenerate ใหม่หลายรอบระหว่าง design — ถ้า DB มี schema เก่าให้ `DROP SCHEMA public CASCADE` แล้ว `alembic upgrade head` ใหม่ (dev เท่านั้น)
 - `_enum_col()` ใน models.py จำเป็น — ถ้าใช้ `SAEnum(MyEnum)` ตรง ๆ Postgres จะเก็บ *ชื่อ member* (`check_in`) ไม่ใช่ *value* (`check-in`)
 - repo ไม่มี `.gitattributes` → มี warning LF/CRLF เวลา `git add` บน Windows (ไม่กระทบอะไร)
+- `.gitignore` ซ่อน `.env*` ทั้งหมด ยกเว้น `**/.env.example` (negation) — ไฟล์ `.env` จริงไม่เคยเข้า git

@@ -1,20 +1,21 @@
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16.15
     container_name: eden-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: admin123
-      POSTGRES_DB: EDEN_DB
+      # ค่าจาก .env ที่ root (ดู .env.example) — มี default สำหรับ dev
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
+      POSTGRES_DB: ${POSTGRES_DB:-EDEN_DB}
     ports:
-      - "5433:5432"
+      - "${POSTGRES_PORT:-5433}:5432"
     volumes:
       # named volume (Docker จัดการเอง) — ทนกว่า bind mount บน Windows
       # ลบเฉพาะเมื่อสั่ง `docker compose down -v` หรือ `docker volume rm` เท่านั้น
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d EDEN_DB"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-EDEN_DB}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -22,16 +23,16 @@ services:
       - eden-network
 
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:9.17
     container_name: eden-pgadmin
     restart: unless-stopped
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@example.com
-      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin123}
       # ลงทะเบียน server EDEN ให้อัตโนมัติ (ไม่ต้อง add เองทุกครั้ง)
       PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
     ports:
-      - "5050:80"
+      - "${PGADMIN_PORT:-5050}:80"
     volumes:
       - pgadmin-data:/var/lib/pgadmin
       - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
@@ -46,10 +47,10 @@ services:
     container_name: eden-backend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${BACKEND_PORT:-8000}:8000"
     environment:
       # ต่อ DB ผ่านชื่อ service ภายใน network (พอร์ตภายในคือ 5432)
-      DATABASE_URL: postgresql://postgres:admin123@postgres:5432/EDEN_DB
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-EDEN_DB}
     # คีย์ลับ (SECRET_KEY ฯลฯ) อ่านจากไฟล์ตอน compose up — ไม่ถูกฝังใน image
     env_file:
       - path: ./backend-eden/.env
@@ -58,6 +59,12 @@ services:
       - ./backend-eden:/app             # map โค้ดเข้าไป (hot reload ผ่าน --reload ได้)
       - /app/.venv                      # กัน .venv ในเครื่องไปทับของใน container
       - ./backend-eden/uploads:/app/uploads  # ไฟล์อัปโหลดอยู่นอก image (prod: เปลี่ยนเป็น named volume)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,14 +76,15 @@ services:
     container_name: eden-frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "${FRONTEND_PORT:-5173}:5173"
     volumes:
       - ./frontend-eden:/app               # Map ไฟล์ในเครื่องเรา เข้าไปใน /app ของ Container
       - /app/node_modules    # ป้องกันไม่ให้ node_modules ในเครื่องไปทับใน Container
     environment:
       - CHOKIDAR_USEPOLLING=true # ช่วยให้ Hot Reload ทำงานได้ดีขึ้นบนบาง OS (เช่น Windows WSL)
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - eden-network
 
