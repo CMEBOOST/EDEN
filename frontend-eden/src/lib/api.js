@@ -54,11 +54,12 @@ export const apiLogin = (username, password) =>
     body: new URLSearchParams({ username, password }),
   });
 
-// อัปโหลดไฟล์ 1 ไฟล์ -> { url, filename } (อย่าตั้ง Content-Type เอง)
-export const apiUpload = (file) => {
+// อัปโหลดไฟล์ 1 ไฟล์ (อย่าตั้ง Content-Type เอง)
+// path ปกติ = /upload/ -> { url, filename } · ระบุ path อื่นได้ (เช่น /profile/avatar)
+export const apiUpload = (file, path = "/upload/") => {
   const fd = new FormData();
   fd.append("file", file);
-  return request("/upload/", { method: "POST", body: fd });
+  return request(path, { method: "POST", body: fd });
 };
 
 // รวม base URL ให้ path ที่ backend คืนมา (เช่น "/uploads/x.png") -> ใช้กับ <img src>

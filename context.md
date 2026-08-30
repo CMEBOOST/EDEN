@@ -57,11 +57,12 @@ EDEN/
 │   │   ├── App.jsx (routing + <RequireAuth>)  main.jsx  index.css
 │   │   ├── lib/          # api.js (Bearer header, 401→logout, apiGet/Post/Put/Patch/Delete/Upload/Login), auth.js (token), datetime.js, avatar.js (avatarSrc + พรีเซ็ต)
 │   │   ├── auth/         # AuthContext.jsx (useAuth: user/login/logout), RequireAuth.jsx
-│   │   ├── components/   # ConfirmDialog.jsx, FileDropField.jsx
+│   │   ├── components/   # ConfirmDialog.jsx, FileDropField.jsx, AvatarPicker.jsx (พรีเซ็ต/อัปโหลด/ค่าเริ่มต้น)
 │   │   ├── layout/       # Sidebar.jsx (เมนูตาม role), Topbar.jsx (avatar+ชื่อ+role+logout)
 │   │   ├── pages/        # Login.jsx, About.jsx, Menu.jsx
 │   │   └── modules/
 │   │       ├── dashboard/ Dashboard.jsx (หน้า `/` — แตกตาม role: admin/staff KPI, tenant สัญญาตัวเอง)
+│   │       ├── profile/   Profile.jsx (หน้า /profile — ทุก role: avatar + เปลี่ยนรหัสตัวเอง + ข้อมูลติดต่อ [เฉพาะผู้เช่า])
 │   │       ├── users/     จัดการผู้ใช้ /users (admin) — Users.jsx, UserForm.jsx (เพิ่ม), UserEditModal.jsx (username+avatar), PasswordResetDialog.jsx
 │   │       ├── audit/     AuditLog.jsx (/log — admin, filter user + ค้นหา + โหลดเพิ่ม)
 │   │       ├── tenants/   Tenants.jsx (list+CRUD), TenantForm.jsx
@@ -124,6 +125,10 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | GET | `/` | health check |
 | POST | `/auth/login` | form (`username`,`password`) → `{access_token, token_type}` (JWT) |
 | GET | `/auth/me` | ข้อมูล user ที่ล็อกอิน (`UserOut`) |
+| GET | `/profile/` | `{user, tenant}` ของตัวเอง — tenant ส่งแค่ `has_national_id` (bool) ไม่ส่งค่าจริง |
+| PATCH/POST | `/profile/avatar` | เปลี่ยนรูปตัวเอง — PATCH `{avatar_url}` (พรีเซ็ต/null) · POST multipart `file` (อัปโหลด, ไม่ผ่าน `/upload/`) |
+| PATCH | `/profile/password` | เปลี่ยนรหัสตัวเอง `{current_password, new_password}` — รหัสเดิมผิด/ใหม่<6 → 400 |
+| PATCH | `/profile/tenant` | ผู้เช่าแก้ข้อมูลติดต่อตัวเอง (`full_name/phone/email/current_address/emergency_contact`) — ไม่ผูก tenant → 404 · national_id แก้ไม่ได้ |
 | POST/GET | `/users/` | สร้าง (admin) / list (staff+) — คืน `UserOut` (`user_id, username, role, is_active, avatar_url, created_at`) |
 | GET/PATCH | `/users/{id}` | อ่าน (staff+) / แก้ (admin) `{username?, is_active?, avatar_url?}` — username ชน→409 · แก้ `is_active` ของตัวเองไม่ได้ (400) · `avatar_url` = null / "admin"/"male"/"female" / "/uploads/..." |
 | PATCH | `/users/{id}/role` | เปลี่ยน role (admin) — เปลี่ยนของตัวเองไม่ได้ (400) |
@@ -149,7 +154,7 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 - ทุก endpoint (ยกเว้น `/auth/login`) ต้องมี `Authorization: Bearer <JWT>`
 - **admin เท่านั้น**: `/users/*`, `/audit-logs/`, `/rates/` (create/update/delete), `DELETE /tenants|/contracts`, ยุติสัญญา (PUT contract `status=terminated`)
 - **staff+**: `/tenants/*`, `/contracts/*` (ทั้ง router), `GET /rates/`, `PATCH /contract-requests/{id}` (รับเรื่อง/ปฏิเสธ/ปิดงาน), POST/PUT อื่น ๆ
-- **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/rates/current`, `/contract-requests/` (POST + GET + DELETE เฉพาะของตัวเอง; ยกเลิกได้เฉพาะ status=pending) — เข้า `/tenants` `/contracts` `/rates` list → 403
+- **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/profile/*` (แก้ของตัวเอง), `/rates/current`, `/contract-requests/` (POST + GET + DELETE เฉพาะของตัวเอง; ยกเลิกได้เฉพาะ status=pending) — เข้า `/tenants` `/contracts` `/rates` list → 403
 - **ต่อสัญญา** = `PUT /contracts/{id}` `{end_date}` (staff+) · **ตรวจสภาพห้องออก** = `POST .../checklists` `{type:check-out}` (staff+) · ตั้ง `terminated` = admin เท่านั้น (staff ตรวจได้ แต่ยุติไม่ได้)
 - `DELETE /tenants/{id}` = **soft delete** (ปิด `is_active` ของ user ที่ผูก, ข้อมูลไม่หาย)
 - `/uploads/<file>` (static) ยังเปิดอ่านได้ไม่ต้อง token (dev)
@@ -254,7 +259,7 @@ npm run dev
 - [x] ต่อ API จริง (`lib/api.js`), หน้า Tenants / Contracts / Rates (list + เพิ่ม/แก้/ลบ), ContractForm
 - [x] คำแจ้งความจำนง — tenant กดจาก Dashboard · staff เห็น RequestPanel บน `/contracts` · หน้าตรวจห้องออก `/contracts/:id/checkout`
 - [x] จัดการผู้ใช้ `/users` (เดิม `/permission` → redirect) — แก้ username, avatar (อัปโหลด/พรีเซ็ต), admin ตั้งรหัสผ่านใหม่, คอลัมน์ผู้เช่า
-- [ ] tenant portal เต็ม: แก้ข้อมูลตัวเอง (UC2.5), ผู้ใช้เปลี่ยนรหัสผ่านตัวเอง (UC6.2)
+- [x] Profile `/profile` (เข้าจาก Topbar) — avatar + เปลี่ยนรหัสตัวเอง (UC6.2) + ผู้เช่าแก้ข้อมูลติดต่อตัวเอง (UC2.5, ยกเว้น national_id)
 - [ ] หน้า contract detail (ดู/แก้ checklist + เอกสารของสัญญา)
 - [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)
 

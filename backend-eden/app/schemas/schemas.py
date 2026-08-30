@@ -81,6 +81,24 @@ class TenantUpdate(BaseModel):
     emergency_contact: str | None = None
 
 
+class ProfileTenantUpdate(BaseModel):
+    """แก้ข้อมูลติดต่อของตัวเอง (ผู้เช่า) — ไม่มี field sensitive"""
+    full_name: str | None = None
+    phone: str | None = None
+    email: str | None = None
+    current_address: str | None = None
+    emergency_contact: str | None = None
+
+
+class AvatarUpdate(BaseModel):
+    avatar_url: str | None = None
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class TenantDocument(BaseModel):
     doc_type: str
     file_url: str

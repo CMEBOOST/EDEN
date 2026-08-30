@@ -34,6 +34,14 @@ def describe(method: str, path: str) -> str:
         return f"เพิ่มเอกสารของผู้เช่า #{parts[1]}"
     if len(parts) >= 3 and parts[0] == "contracts" and parts[2] == "checklists":
         return f"บันทึกสภาพห้อง สัญญา #{parts[1]}"
+    if parts[0] == "profile":
+        if len(parts) >= 2 and parts[1] == "password":
+            return "เปลี่ยนรหัสผ่านตัวเอง"
+        if len(parts) >= 2 and parts[1] == "tenant":
+            return "แก้ไขข้อมูลติดต่อของตัวเอง"
+        if len(parts) >= 2 and parts[1] == "avatar":
+            return "เปลี่ยนรูปโปรไฟล์"
+        return "แก้ไขโปรไฟล์"
     if parts[0] == "contract-requests":
         if method == "POST":
             return "แจ้งความจำนง (ต่อ/ยุติสัญญา)"

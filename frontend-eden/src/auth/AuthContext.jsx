@@ -51,8 +51,15 @@ export function AuthProvider({ children }) {
     setUser(null);
   }
 
+  // ดึงข้อมูล user ล่าสุด (เรียกหลังแก้โปรไฟล์ตัวเอง)
+  async function refreshUser() {
+    const me = await apiGet("/auth/me");
+    setUser(me);
+    return me;
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

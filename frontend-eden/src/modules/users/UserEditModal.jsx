@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { apiPatch, apiUpload } from "../../lib/api";
-import { avatarSrc, PRESET_OPTIONS, AVATAR_PRESETS } from "../../lib/avatar";
+import AvatarPicker from "../../components/AvatarPicker";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
@@ -18,21 +18,6 @@ function UserEditModal({ user, onClose, onSaved }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  const filePreview = useMemo(
-    () => (file ? URL.createObjectURL(file) : null),
-    [file]
-  );
-  useEffect(
-    () => () => {
-      if (filePreview) URL.revokeObjectURL(filePreview);
-    },
-    [filePreview]
-  );
-
-  const previewSrc =
-    filePreview ??
-    avatarSrc({ avatar_url: avatarValue, role: user.role });
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -56,9 +41,7 @@ function UserEditModal({ user, onClose, onSaved }) {
       onSaved?.(updated);
       onClose?.();
     } catch (err) {
-      setError(
-        err.status === 409 ? "username นี้มีอยู่แล้ว" : err.message
-      );
+      setError(err.status === 409 ? "username นี้มีอยู่แล้ว" : err.message);
       setBusy(false);
     }
   }
@@ -90,63 +73,13 @@ function UserEditModal({ user, onClose, onSaved }) {
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex items-center gap-4">
-            <img
-              src={previewSrc}
-              alt=""
-              className="w-16 h-16 rounded-full object-cover border border-gray-200"
-            />
-            <div className="flex flex-col gap-1.5">
-              <div className="flex gap-1.5">
-                {PRESET_OPTIONS.map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    title={label}
-                    onClick={() => {
-                      setFile(null);
-                      setAvatarValue(key);
-                    }}
-                    className={`border rounded-full p-0.5 ${
-                      !file && avatarValue === key
-                        ? "border-blue-500"
-                        : "border-transparent hover:border-gray-300"
-                    }`}
-                  >
-                    <img
-                      src={AVATAR_PRESETS[key]}
-                      alt={label}
-                      className="w-8 h-8 rounded-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2 text-xs">
-                <label className="text-blue-600 hover:underline cursor-pointer">
-                  อัปโหลดรูป
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files[0]) setFile(e.target.files[0]);
-                      e.target.value = "";
-                    }}
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFile(null);
-                    setAvatarValue(null);
-                  }}
-                  className="text-gray-500 hover:underline"
-                >
-                  ใช้ค่าเริ่มต้น
-                </button>
-              </div>
-            </div>
-          </div>
+          <AvatarPicker
+            value={avatarValue}
+            file={file}
+            role={user.role}
+            onChangeValue={setAvatarValue}
+            onChangeFile={setFile}
+          />
 
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-gray-600">ชื่อผู้ใช้</span>

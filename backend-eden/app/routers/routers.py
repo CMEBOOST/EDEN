@@ -200,7 +200,9 @@ def get_tenant_route(tenant_id: int, db: Session = Depends(get_db)):
 def update_tenant_route(
     tenant_id: int, data: schemas.TenantUpdate, db: Session = Depends(get_db)
 ):
-    tenant = tenent_crud.update_tenant(db=db, tenant_id=tenant_id, data=data)
+    tenant = tenent_crud.update_tenant(
+        db=db, tenant_id=tenant_id, fields=data.model_dump(exclude_unset=True)
+    )
     if tenant is None:
         raise HTTPException(status_code=404, detail="ไม่พบผู้เช่า")
     return tenant
@@ -539,6 +541,92 @@ def delete_request_route(
 
     request_crud.delete_request(db=db, request_id=request_id)
     return {"ok": True}
+
+
+# ---------------------------------------------------------------------------
+# Profile — จัดการโปรไฟล์ของตัวเอง (ทุก role)
+# ---------------------------------------------------------------------------
+profile_router = APIRouter(prefix="/profile", tags=["Profile"], dependencies=_auth)
+
+_SENSITIVE_TENANT = {"national_id_encrypted", "user_id", "tenant_id", "last_login_at"}
+
+
+def _tenant_public(tenant: models.Tenants) -> dict:
+    return {
+        "tenant_id": tenant.tenant_id,
+        "full_name": tenant.full_name,
+        "phone": tenant.phone,
+        "email": tenant.email,
+        "current_address": tenant.current_address,
+        "emergency_contact": tenant.emergency_contact,
+        "has_national_id": bool(tenant.national_id_encrypted),
+    }
+
+
+@profile_router.get("/")
+def get_profile_route(
+    db: Session = Depends(get_db), me: models.Users = Depends(get_current_user)
+):
+    tenant = tenent_crud.get_tenant_by_user(db=db, user_id=me.user_id)
+    return {
+        "user": schemas.UserOut.model_validate(me),
+        "tenant": _tenant_public(tenant) if tenant is not None else None,
+    }
+
+
+@profile_router.patch("/avatar", response_model=schemas.UserOut)
+def update_profile_avatar_route(
+    data: schemas.AvatarUpdate,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(get_current_user),
+):
+    return user_crud.update_user(db, me.user_id, {"avatar_url": data.avatar_url})
+
+
+@profile_router.post("/avatar", response_model=schemas.UserOut)
+def upload_profile_avatar_route(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(get_current_user),
+):
+    url = save_upload(file)
+    return user_crud.update_user(db, me.user_id, {"avatar_url": url})
+
+
+@profile_router.patch("/password")
+def change_password_route(
+    data: schemas.PasswordChange,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(get_current_user),
+):
+    if not verify_password(data.current_password, me.password_hash):
+        raise HTTPException(status_code=400, detail="รหัสผ่านเดิมไม่ถูกต้อง")
+    if len(data.new_password) < 6:
+        raise HTTPException(
+            status_code=400, detail="รหัสผ่านใหม่สั้นเกินไป (อย่างน้อย 6 ตัว)"
+        )
+    user_crud.set_password(db, me.user_id, data.new_password)
+    return {"ok": True}
+
+
+@profile_router.patch("/tenant")
+def update_profile_tenant_route(
+    data: schemas.ProfileTenantUpdate,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(get_current_user),
+):
+    tenant = tenent_crud.get_tenant_by_user(db=db, user_id=me.user_id)
+    if tenant is None:
+        raise HTTPException(status_code=404, detail="บัญชีนี้ไม่ได้ผูกกับผู้เช่า")
+    fields = {
+        k: v
+        for k, v in data.model_dump(exclude_unset=True).items()
+        if k not in _SENSITIVE_TENANT
+    }
+    updated = tenent_crud.update_tenant(db=db, tenant_id=tenant.tenant_id, fields=fields)
+    if updated is None:
+        raise HTTPException(status_code=404, detail="ไม่พบผู้เช่า")
+    return _tenant_public(updated)
 
 
 # ---------------------------------------------------------------------------

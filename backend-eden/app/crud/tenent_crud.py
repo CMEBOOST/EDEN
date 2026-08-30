@@ -40,13 +40,12 @@ def get_tenant_by_user(db: Session, user_id: int):
     )
 
 
-def update_tenant(db: Session, tenant_id: int, data: schemas.TenantUpdate):
+def update_tenant(db: Session, tenant_id: int, fields: dict):
     tenant = get_tenant(db, tenant_id)
     if tenant is None:
         return None
 
-    # อัปเดตเฉพาะ field ที่ส่งมา
-    for field, value in data.model_dump(exclude_unset=True).items():
+    for field, value in fields.items():
         setattr(tenant, field, value)
 
     db.commit()

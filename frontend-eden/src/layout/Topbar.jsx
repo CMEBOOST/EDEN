@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { avatarSrc } from "../lib/avatar";
 
@@ -20,7 +20,11 @@ function TopBar() {
           🔔
         </button>
 
-        <div className="flex items-center gap-2 border border-gray-200 px-3 py-1.5 rounded-lg">
+        <Link
+          to="/profile"
+          className="flex items-center gap-2 border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+          title="โปรไฟล์ของฉัน"
+        >
           <img
             src={avatarSrc(user)}
             alt=""
@@ -34,7 +38,7 @@ function TopBar() {
               {roleLabel[user?.role] ?? user?.role}
             </div>
           </div>
-        </div>
+        </Link>
 
         <button
           onClick={handleLogout}

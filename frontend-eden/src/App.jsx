@@ -15,6 +15,7 @@ import Dashboard from "./modules/dashboard/Dashboard";
 import Contracts from "./modules/contracts/Contracts";
 import ContractForm from "./modules/contracts/ContractForm";
 import CheckoutInspection from "./modules/requests/CheckoutInspection";
+import Profile from "./modules/profile/Profile";
 import Tenants from "./modules/tenants/Tenants";
 import Rates from "./modules/rates/Rates";
 import Users from "./modules/users/Users";
@@ -52,6 +53,7 @@ function App() {
           >
             <Route path="/" element={<Dashboard />} />
             <Route path="/menu" element={<Menu />} />
+            <Route path="/profile" element={<Profile />} />
             <Route
               path="/tenants"
               element={
