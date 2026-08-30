@@ -20,6 +20,16 @@ _credentials_exc = HTTPException(
 )
 
 
+def username_from_token(token: str | None) -> str | None:
+    """decode token แบบเงียบ ๆ (ใช้ใน audit middleware) — คืน username หรือ None"""
+    if not token:
+        return None
+    try:
+        return jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM]).get("sub")
+    except jwt.PyJWTError:
+        return None
+
+
 def create_access_token(username: str) -> str:
     now = datetime.datetime.now(datetime.timezone.utc)
     payload = {

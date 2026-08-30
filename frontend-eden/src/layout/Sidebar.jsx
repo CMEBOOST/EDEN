@@ -31,13 +31,15 @@ function Sidebar() {
           💵 อัตราค่าบริการ
         </Link>
         {user?.role === "admin" && (
-          <Link to="/permission" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900/50 hover:text-white transition-colors">
-            🔐 จัดการสิทธ์
-          </Link>
+          <>
+            <Link to="/permission" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900/50 hover:text-white transition-colors">
+              🔐 จัดการสิทธ์
+            </Link>
+            <Link to="/log" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900/50 hover:text-white transition-colors">
+              🪵 Audit Log
+            </Link>
+          </>
         )}
-        <Link to="/log" className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-blue-900/50 hover:text-white transition-colors">
-          🪵 Audit Log
-        </Link>
       </div>
 
     </div>

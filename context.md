@@ -62,6 +62,7 @@ EDEN/
 │   │   ├── pages/        # Login.jsx, Home.jsx, About.jsx, Menu.jsx
 │   │   └── modules/
 │   │       ├── users/     Users.jsx (จัดการสิทธิ์ /permission — admin), UserForm.jsx
+│   │       ├── audit/     AuditLog.jsx (/log — admin, filter user + ค้นหา + โหลดเพิ่ม)
 │   │       ├── tenants/   Tenants.jsx (list+CRUD), TenantForm.jsx
 │   │       ├── contracts/ Contracts.jsx (list+แก้/ลบ), ContractForm.jsx (/contracts/new — 3 ส่วน),
 │   │       │              ContractEditForm.jsx, ChecklistEditor.jsx, DocumentUploader.jsx
@@ -132,8 +133,11 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | POST/GET | `/rates/` | อัตราค่าน้ำ/ค่าไฟ (`{type: water\|electric, rate_value, effective_date}`) · query `type` · POST ชน `(type, effective_date)` เดิม → **409** `{message, existing_rate_id}` |
 | GET | `/rates/current` | อัตราที่มีผล ณ วันนี้ (หรือ `?date=`) → `{water: {...}\|null, electric: {...}\|null}` |
 | GET/PUT/DELETE | `/rates/{rate_id}` | อ่าน / แก้ (`RateConfigUpdate`, PUT เข้า slot ที่มีแล้ว → 409) / ลบ |
+| GET | `/audit-logs/` | **admin เท่านั้น** — query `skip`,`limit`,`user_id`,`q` (ค้นข้อความ action) |
 
-**Auth:** ทุก endpoint (ยกเว้น `/auth/login`) ต้องส่ง header `Authorization: Bearer <JWT>` · route ที่เขียนข้อมูล (POST/PUT/PATCH/DELETE) ต้องเป็น role `staff` หรือ `admin` · `/users/*` จัดการสิทธิ์ = `admin` เท่านั้น · `/uploads/<file>` (static) ยังเปิดอ่านได้ไม่ต้อง token (dev)
+**Auth:** ทุก endpoint (ยกเว้น `/auth/login`) ต้องส่ง header `Authorization: Bearer <JWT>` · route ที่เขียนข้อมูล (POST/PUT/PATCH/DELETE) ต้องเป็น role `staff` หรือ `admin` · `/users/*` + `/audit-logs/` = `admin` เท่านั้น · `/uploads/<file>` (static) ยังเปิดอ่านได้ไม่ต้อง token (dev)
+
+**Audit log:** `AuditMiddleware` ([app/core/audit.py](backend-eden/app/core/audit.py)) บันทึกทุก request ที่ method เป็น POST/PUT/PATCH/DELETE + สำเร็จ (2xx) ลง `audit_logs` โดย decode token เอาว่าใครทำ + `describe()` แปลง method+path เป็นข้อความไทย · login บันทึกแยกใน route
 
 > `/tenants/` ยังคืน `national_id_encrypted` (ยังไม่มี response schema แยก) · `created_by`/`uploaded_by` ยัง `null` (ยังไม่ set จาก current user)
 
@@ -207,10 +211,11 @@ npm run dev
 ## 9. สถานะ / สิ่งที่ยังต้องทำ (TODO)
 
 **Backend**
-- [x] endpoint: auth (login/JWT) / users (จัดการสิทธิ์) / tenants / contracts / documents / checklists / upload / rates
-- [x] auth เต็ม — ทุก endpoint ต้องล็อกอิน, write = staff+, จัดการสิทธิ์ = admin
+- [x] endpoint: auth / users / tenants / contracts / documents / checklists / upload / rates / audit-logs
+- [x] auth เต็ม — ทุก endpoint ต้องล็อกอิน, write = staff+, จัดการสิทธิ์ + audit = admin
 - [x] `UserOut` (ไม่มี password_hash) · secret ไป `.env`
-- [ ] endpoint: audit_logs · เก็บ `created_by`/`uploaded_by` จาก current user (ตอนนี้ frontend ยังไม่ส่ง)
+- [x] audit log — middleware บันทึกทุก write อัตโนมัติ
+- [ ] เก็บ `created_by`/`uploaded_by` จาก current user (ตอนนี้ frontend ยังไม่ส่ง)
 - [ ] response schema แยกสำหรับ tenants (`/tenants/` ยังคืน `national_id_encrypted`)
 - [ ] ตาราง `rooms` + ผูก FK `contracts.room_id`
 - [ ] เข้ารหัส `national_id_encrypted` จริง (ตอนนี้เป็นแค่ชื่อคอลัมน์)
@@ -219,7 +224,7 @@ npm run dev
 - [ ] เขียน tests
 
 **Frontend**
-- [x] auth: Login page, AuthContext, RequireAuth, Bearer header, role-aware Sidebar/Topbar, หน้าจัดการสิทธิ์
+- [x] auth: Login page, AuthContext, RequireAuth, Bearer header, role-aware Sidebar/Topbar, หน้าจัดการสิทธิ์, หน้า Audit Log
 - [x] ต่อ API จริง (`lib/api.js`), หน้า Tenants / Contracts / Rates (list + เพิ่ม/แก้/ลบ), ContractForm
 - [ ] หน้า contract detail (ดู/แก้ checklist + เอกสารของสัญญา)
 - [ ] dashboard (หน้าแรกยัง placeholder)

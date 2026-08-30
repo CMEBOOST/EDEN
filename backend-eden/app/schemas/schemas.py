@@ -34,6 +34,14 @@ class UserActiveUpdate(BaseModel):
     is_active: bool
 
 
+class AuditLogOut(BaseModel):
+    log_id: int
+    action: str
+    created_at: datetime.datetime
+    user_id: int | None
+    username: str | None
+
+
 class Tenants(BaseModel):
     user_id: int
     full_name: str

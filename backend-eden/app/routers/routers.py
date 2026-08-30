@@ -13,6 +13,7 @@ from ..core.auth import (
 from ..core.security import verify_password
 from ..core.storage import save_upload
 from ..crud import (
+    audit_crud,
     checklist_crud,
     contracts_crud,
     document_crud,
@@ -47,6 +48,7 @@ def login_route(
         )
     if not user.is_active:
         raise HTTPException(status_code=403, detail="บัญชีนี้ถูกปิดการใช้งาน")
+    audit_crud.write(db, user.user_id, "เข้าสู่ระบบ")
     return schemas.Token(access_token=create_access_token(user.username))
 
 
@@ -345,3 +347,22 @@ def delete_rate_route(rate_id: int, db: Session = Depends(get_db)):
     if rate is None:
         raise HTTPException(status_code=404, detail="ไม่พบอัตราค่าบริการ")
     return {"delete": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Audit logs (เฉพาะ admin)
+# ---------------------------------------------------------------------------
+audit_router = APIRouter(
+    prefix="/audit-logs", tags=["Audit"], dependencies=[Depends(require_admin)]
+)
+
+
+@audit_router.get("/", response_model=list[schemas.AuditLogOut])
+def list_audit_logs_route(
+    skip: int = 0,
+    limit: int = 50,
+    user_id: int | None = None,
+    q: str | None = None,
+    db: Session = Depends(get_db),
+):
+    return audit_crud.get_logs(db, skip=skip, limit=limit, user_id=user_id, q=q)

@@ -17,6 +17,7 @@ import ContractForm from "./modules/contracts/ContractForm";
 import Tenants from "./modules/tenants/Tenants";
 import Rates from "./modules/rates/Rates";
 import Users from "./modules/users/Users";
+import AuditLog from "./modules/audit/AuditLog";
 
 function Layout() {
   return (
@@ -59,6 +60,14 @@ function App() {
               element={
                 <RequireAuth roles={["admin"]}>
                   <Users />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/log"
+              element={
+                <RequireAuth roles={["admin"]}>
+                  <AuditLog />
                 </RequireAuth>
               }
             />

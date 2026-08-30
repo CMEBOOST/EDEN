@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .core.audit import AuditMiddleware
 from .core.storage import UPLOAD_DIR
 from .routers import routers
 
@@ -23,6 +24,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# บันทึก audit log ทุก request ที่เปลี่ยนข้อมูลและสำเร็จ
+app.add_middleware(AuditMiddleware)
+
 # เสิร์ฟไฟล์อัปโหลด (รูป checklist / เอกสาร) ที่ /uploads
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
@@ -33,6 +37,7 @@ app.include_router(routers.tenant_router)
 app.include_router(routers.document_router)
 app.include_router(routers.contract_router)
 app.include_router(routers.rate_router)
+app.include_router(routers.audit_router)
 
 
 @app.get("/")
