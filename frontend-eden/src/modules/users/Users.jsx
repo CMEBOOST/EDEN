@@ -1,9 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { apiGet, apiPatch } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import { avatarSrc } from "../../lib/avatar";
 import { useAuth } from "../../auth/AuthContext";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import UserForm from "./UserForm";
+import UserEditModal from "./UserEditModal";
+import PasswordResetDialog from "./PasswordResetDialog";
 
 const ROLE_OPTIONS = [
   ["tenant", "ผู้เช่า"],
@@ -19,18 +22,28 @@ const roleStyle = {
 function Users() {
   const { user: me } = useAuth();
   const [users, setUsers] = useState([]);
+  const [tenantsByUser, setTenantsByUser] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [rowBusy, setRowBusy] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [resetting, setResetting] = useState(null);
   const [deactivating, setDeactivating] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiGet("/users/");
-        if (!cancelled) setUsers(data);
+        const [us, ts] = await Promise.all([
+          apiGet("/users/"),
+          apiGet("/tenants/"),
+        ]);
+        if (cancelled) return;
+        setUsers(us);
+        setTenantsByUser(
+          Object.fromEntries(ts.map((t) => [t.user_id, t]))
+        );
       } catch (e) {
         if (!cancelled) setError(e.message);
       } finally {
@@ -68,18 +81,24 @@ function Users() {
     }
   }
 
+  const sorted = useMemo(
+    () => [...users].sort((a, b) => a.user_id - b.user_id),
+    [users]
+  );
+
   return (
     <div className="p-2 flex flex-col gap-3 font-sans">
       <div className="flex justify-between">
         <div>
-          <h2 className="text-3xl">จัดการสิทธิ์</h2>
+          <h2 className="text-3xl">จัดการผู้ใช้</h2>
           <p className="text-gray-500">
-            ปรับ role และเปิด/ปิดการใช้งานผู้ใช้ {!loading && `(${users.length})`}
+            บัญชีผู้ใช้ · role · สถานะ · รหัสผ่าน{" "}
+            {!loading && `(${users.length})`}
           </p>
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="px-3 py-2 bg-blue-500 rounded text-gray-100 hover:bg-blue-600"
+          className="px-3 py-2 bg-blue-500 rounded text-gray-100 hover:bg-blue-600 h-fit"
         >
           เพิ่มผู้ใช้
         </button>
@@ -89,23 +108,25 @@ function Users() {
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-gray-100 text-gray-600 uppercase text-xs tracking-wide">
             <tr>
-              <th className="px-4 py-3 font-medium">ชื่อผู้ใช้</th>
+              <th className="px-4 py-3 font-medium">ผู้ใช้</th>
               <th className="px-4 py-3 font-medium">สิทธิ์ (role)</th>
+              <th className="px-4 py-3 font-medium">ผู้เช่า</th>
               <th className="px-4 py-3 font-medium text-center">สถานะ</th>
               <th className="px-4 py-3 font-medium">สร้างเมื่อ</th>
+              <th className="px-4 py-3 font-medium text-center">จัดการ</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
+                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
                   กำลังโหลด...
                 </td>
               </tr>
             )}
             {error && !loading && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-red-600">
+                <td colSpan={6} className="px-4 py-6 text-center text-red-600">
                   {error}
                 </td>
               </tr>
@@ -113,19 +134,29 @@ function Users() {
 
             {!loading &&
               !error &&
-              users.map((u) => {
+              sorted.map((u) => {
                 const isMe = u.user_id === me?.user_id;
                 const disabled = isMe || rowBusy === u.user_id;
+                const tenant = tenantsByUser[u.user_id];
                 return (
                   <tr
                     key={u.user_id}
                     className={`bg-white ${u.is_active ? "" : "opacity-50"}`}
                   >
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {u.username}
-                      {isMe && (
-                        <span className="ml-2 text-xs text-gray-400">(คุณ)</span>
-                      )}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <img
+                          src={avatarSrc(u)}
+                          alt=""
+                          className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"
+                        />
+                        <span className="font-medium text-gray-900">
+                          {u.username}
+                        </span>
+                        {isMe && (
+                          <span className="text-xs text-gray-400">(คุณ)</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <select
@@ -142,6 +173,9 @@ function Users() {
                           </option>
                         ))}
                       </select>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {tenant ? tenant.full_name : "—"}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <button
@@ -163,6 +197,22 @@ function Users() {
                     <td className="px-4 py-3 text-gray-500">
                       {formatDate(u.created_at)}
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => setEditing(u)}
+                          className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
+                        >
+                          แก้ไข
+                        </button>
+                        <button
+                          onClick={() => setResetting(u)}
+                          className="px-2 py-1 text-xs rounded text-gray-600 hover:bg-gray-100"
+                        >
+                          ตั้งรหัสใหม่
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 );
               })}
@@ -174,6 +224,21 @@ function Users() {
         <UserForm
           onClose={() => setShowForm(false)}
           onCreated={(u) => setUsers((prev) => [...prev, u])}
+        />
+      )}
+
+      {editing && (
+        <UserEditModal
+          user={editing}
+          onClose={() => setEditing(null)}
+          onSaved={replaceRow}
+        />
+      )}
+
+      {resetting && (
+        <PasswordResetDialog
+          user={resetting}
+          onClose={() => setResetting(null)}
         />
       )}
 

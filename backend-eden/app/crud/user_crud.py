@@ -51,3 +51,24 @@ def set_active(db: Session, user_id: int, is_active: bool):
     db.commit()
     db.refresh(user)
     return user
+
+
+def update_user(db: Session, user_id: int, data: dict):
+    user = get_user_by_id(db, user_id)
+    if user is None:
+        return None
+    for field, value in data.items():
+        setattr(user, field, value)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+def set_password(db: Session, user_id: int, new_password: str):
+    user = get_user_by_id(db, user_id)
+    if user is None:
+        return None
+    user.password_hash = hash_password(new_password)
+    db.commit()
+    db.refresh(user)
+    return user

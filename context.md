@@ -46,7 +46,7 @@ EDEN/
 │   │       ├── security.py    # hash_password / verify_password (bcrypt)
 │   │       ├── auth.py        # JWT: create_access_token, get_current_user, require_roles/require_staff/require_admin
 │   │       └── config.py      # SECRET_KEY ฯลฯ จาก .env
-│   ├── alembic/versions/      # 92c0fb6fb117 (init) → 1dd5441d68a1 (unique rate) → b1c330f21e71 (contract_requests)
+│   ├── alembic/versions/      # init → unique rate → contract_requests → b33c320591bb (users.avatar_url)
 │   ├── alembic.ini · main.py (shim) · Dockerfile / .dockerignore
 │   ├── create_admin.py        # seed admin คนแรก
 │   ├── .env (gitignore) / .env.example
@@ -55,14 +55,14 @@ EDEN/
 ├── frontend-eden/             # React + Vite — src/ จัดเป็น module-based
 │   ├── src/
 │   │   ├── App.jsx (routing + <RequireAuth>)  main.jsx  index.css
-│   │   ├── lib/          # api.js (Bearer header, 401→logout, apiGet/Post/Put/Patch/Delete/Upload/Login), auth.js (token), datetime.js
+│   │   ├── lib/          # api.js (Bearer header, 401→logout, apiGet/Post/Put/Patch/Delete/Upload/Login), auth.js (token), datetime.js, avatar.js (avatarSrc + พรีเซ็ต)
 │   │   ├── auth/         # AuthContext.jsx (useAuth: user/login/logout), RequireAuth.jsx
 │   │   ├── components/   # ConfirmDialog.jsx, FileDropField.jsx
-│   │   ├── layout/       # Sidebar.jsx (เมนูตาม role), Topbar.jsx (ชื่อ+role+logout)
+│   │   ├── layout/       # Sidebar.jsx (เมนูตาม role), Topbar.jsx (avatar+ชื่อ+role+logout)
 │   │   ├── pages/        # Login.jsx, About.jsx, Menu.jsx
 │   │   └── modules/
 │   │       ├── dashboard/ Dashboard.jsx (หน้า `/` — แตกตาม role: admin/staff KPI, tenant สัญญาตัวเอง)
-│   │       ├── users/     Users.jsx (จัดการสิทธิ์ /permission — admin), UserForm.jsx
+│   │       ├── users/     จัดการผู้ใช้ /users (admin) — Users.jsx, UserForm.jsx (เพิ่ม), UserEditModal.jsx (username+avatar), PasswordResetDialog.jsx
 │   │       ├── audit/     AuditLog.jsx (/log — admin, filter user + ค้นหา + โหลดเพิ่ม)
 │   │       ├── tenants/   Tenants.jsx (list+CRUD), TenantForm.jsx
 │   │       ├── contracts/ Contracts.jsx (list+แก้/ลบ + <RequestPanel>), ContractForm.jsx (/contracts/new — 3 ส่วน),
@@ -70,6 +70,7 @@ EDEN/
 │   │       ├── requests/  คำแจ้งความจำนง — IntentNoticeDialog (tenant), RequestPanel/RenewDialog/RejectDialog (staff),
 │   │       │              CheckoutInspection.jsx (หน้า /contracts/:id/checkout), requestMeta.js
 │   │       └── rates/     Rates.jsx (list+CRUD ค่าน้ำ/ค่าไฟ), RateForm.jsx
+│   ├── assets/           # รูป avatar ตั้งต้น: adminIcon.png / maleIcon.png / femaleIcon.png (นอก src/ แต่ใน Vite root — import ได้)
 │   ├── Dockerfile
 │   └── package.json / vite.config.js
 │
@@ -91,7 +92,7 @@ Source of truth = [backend-eden/app/models/models.py](backend-eden/app/models/mo
 
 | ตาราง | PK | คอลัมน์สำคัญ | FK |
 |---|---|---|---|
-| `users` | user_id | username (uq), password_hash, role, is_active | — |
+| `users` | user_id | username (uq), password_hash, role, is_active, avatar_url | — |
 | `tenants` | tenant_id | full_name, phone, email, national_id_encrypted, last_login_at | user_id → users |
 | `tenant_documents` | doc_id | doc_type, file_url | tenant_id → tenants, uploaded_by → users |
 | `contracts` | contract_id | start/end_date, rent, security_deposit, status, room_id* | tenant_id → tenants, created_by → users |
@@ -123,12 +124,13 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | GET | `/` | health check |
 | POST | `/auth/login` | form (`username`,`password`) → `{access_token, token_type}` (JWT) |
 | GET | `/auth/me` | ข้อมูล user ที่ล็อกอิน (`UserOut`) |
-| POST/GET | `/users/` | สร้าง (admin) / list (staff+) — คืน `UserOut` (ไม่มี password_hash) |
-| GET/PATCH | `/users/{id}` | อ่าน (staff+) / เปิด-ปิด `is_active` (admin) |
+| POST/GET | `/users/` | สร้าง (admin) / list (staff+) — คืน `UserOut` (`user_id, username, role, is_active, avatar_url, created_at`) |
+| GET/PATCH | `/users/{id}` | อ่าน (staff+) / แก้ (admin) `{username?, is_active?, avatar_url?}` — username ชน→409 · แก้ `is_active` ของตัวเองไม่ได้ (400) · `avatar_url` = null / "admin"/"male"/"female" / "/uploads/..." |
 | PATCH | `/users/{id}/role` | เปลี่ยน role (admin) — เปลี่ยนของตัวเองไม่ได้ (400) |
+| PATCH | `/users/{id}/password` | admin ตั้งรหัสผ่านใหม่ให้โดยตรง (`{new_password}` ≥6 ตัว) |
 | POST | `/upload/` | อัปโหลดไฟล์ 1 ไฟล์ (multipart `file`) → `{url, filename}` · จำกัด jpg/png/webp/gif/pdf ≤ 10MB |
 | GET | `/uploads/<name>` | เสิร์ฟไฟล์ที่อัปโหลด (StaticFiles จาก `backend-eden/uploads/`) |
-| POST/GET | `/tenants/` | สร้าง / list (create เช็ค `user_id` มีจริง) |
+| POST/GET | `/tenants/` | สร้าง / list · create: user ต้อง role=tenant (400), ยังไม่ผูก tenant อื่น (409) |
 | GET/PUT/DELETE | `/tenants/{id}` | อ่าน / แก้ (`TenantUpdate`) / ลบ |
 | POST/GET | `/tenants/{id}/documents` | เอกสารของผู้เช่า (`{doc_type, file_url, uploaded_by?}`) |
 | DELETE | `/documents/{doc_id}` | ลบเอกสาร |
@@ -136,7 +138,7 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | GET/PUT/DELETE | `/contracts/{id}` | อ่าน / แก้ (`ContractUpdate`) / ลบ |
 | POST/GET | `/contracts/{id}/checklists` | บันทึกสภาพห้อง — `{type: check-in\|check-out, items:[{name,status,note,photos,cost}], tenant_signature?}` → เก็บ `checklist_items` (JSON) + `photo_urls` (flat) · `cost` = ค่าเสียหายรายรายการ (ใช้ตอน check-out) |
 | POST/GET | `/contract-requests/` | คำแจ้งความจำนง — POST `{contract_id, request_type: renew\|terminate, tenant_note, preferred_date?}` (tenant = สัญญาตัวเอง, ซ้ำ→409) · GET tenant เห็นของตัวเอง / staff+ เห็นหมด (query `status`) |
-| GET/PATCH | `/contract-requests/{id}` | GET (tenant เจ้าของ/staff+) · PATCH (staff+) `{status, staff_note, preferred_date, damage_total}` — completed+terminate ต้องมี checklist check-out ก่อน (400) |
+| GET/PATCH/DELETE | `/contract-requests/{id}` | GET (tenant เจ้าของ/staff+) · PATCH (staff+) `{status, staff_note, preferred_date, damage_total}` — completed+terminate ต้องมี checklist check-out ก่อน (400) · DELETE = ยกเลิกคำแจ้ง (tenant ยกเลิกได้เฉพาะของตัวเองที่ status=pending / staff+ ลบได้ทุกอัน) |
 | POST/GET | `/rates/` | อัตราค่าน้ำ/ค่าไฟ (`{type: water\|electric, rate_value, effective_date}`) · query `type` · POST ชน `(type, effective_date)` เดิม → **409** `{message, existing_rate_id}` |
 | GET | `/rates/current` | อัตราที่มีผล ณ วันนี้ (หรือ `?date=`) → `{water: {...}\|null, electric: {...}\|null}` |
 | GET/PUT/DELETE | `/rates/{rate_id}` | อ่าน / แก้ (`RateConfigUpdate`, PUT เข้า slot ที่มีแล้ว → 409) / ลบ |
@@ -147,7 +149,7 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 - ทุก endpoint (ยกเว้น `/auth/login`) ต้องมี `Authorization: Bearer <JWT>`
 - **admin เท่านั้น**: `/users/*`, `/audit-logs/`, `/rates/` (create/update/delete), `DELETE /tenants|/contracts`, ยุติสัญญา (PUT contract `status=terminated`)
 - **staff+**: `/tenants/*`, `/contracts/*` (ทั้ง router), `GET /rates/`, `PATCH /contract-requests/{id}` (รับเรื่อง/ปฏิเสธ/ปิดงาน), POST/PUT อื่น ๆ
-- **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/rates/current`, `/contract-requests/` (POST+GET เฉพาะสัญญาตัวเอง) — เข้า `/tenants` `/contracts` `/rates` list → 403
+- **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/rates/current`, `/contract-requests/` (POST + GET + DELETE เฉพาะของตัวเอง; ยกเลิกได้เฉพาะ status=pending) — เข้า `/tenants` `/contracts` `/rates` list → 403
 - **ต่อสัญญา** = `PUT /contracts/{id}` `{end_date}` (staff+) · **ตรวจสภาพห้องออก** = `POST .../checklists` `{type:check-out}` (staff+) · ตั้ง `terminated` = admin เท่านั้น (staff ตรวจได้ แต่ยุติไม่ได้)
 - `DELETE /tenants/{id}` = **soft delete** (ปิด `is_active` ของ user ที่ผูก, ข้อมูลไม่หาย)
 - `/uploads/<file>` (static) ยังเปิดอ่านได้ไม่ต้อง token (dev)
@@ -251,7 +253,8 @@ npm run dev
 - [x] RBAC frontend — เมนู/route จำกัดตาม role, ซ่อนปุ่มลบ/ยุติสัญญาสำหรับ non-admin
 - [x] ต่อ API จริง (`lib/api.js`), หน้า Tenants / Contracts / Rates (list + เพิ่ม/แก้/ลบ), ContractForm
 - [x] คำแจ้งความจำนง — tenant กดจาก Dashboard · staff เห็น RequestPanel บน `/contracts` · หน้าตรวจห้องออก `/contracts/:id/checkout`
-- [ ] tenant portal เต็ม: แก้ข้อมูลตัวเอง (UC2.5), เปลี่ยนรหัสผ่าน (UC6.2)
+- [x] จัดการผู้ใช้ `/users` (เดิม `/permission` → redirect) — แก้ username, avatar (อัปโหลด/พรีเซ็ต), admin ตั้งรหัสผ่านใหม่, คอลัมน์ผู้เช่า
+- [ ] tenant portal เต็ม: แก้ข้อมูลตัวเอง (UC2.5), ผู้ใช้เปลี่ยนรหัสผ่านตัวเอง (UC6.2)
 - [ ] หน้า contract detail (ดู/แก้ checklist + เอกสารของสัญญา)
 - [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)
 

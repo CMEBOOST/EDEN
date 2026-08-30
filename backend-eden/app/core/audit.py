@@ -26,8 +26,10 @@ def describe(method: str, path: str) -> str:
         return "อัปโหลดไฟล์"
     if len(parts) >= 3 and parts[0] == "users" and parts[2] == "role":
         return f"เปลี่ยนสิทธิ์ผู้ใช้ #{parts[1]}"
+    if len(parts) >= 3 and parts[0] == "users" and parts[2] == "password":
+        return f"รีเซ็ตรหัสผ่านผู้ใช้ #{parts[1]}"
     if len(parts) == 2 and parts[0] == "users" and method == "PATCH":
-        return f"เปิด/ปิดการใช้งานผู้ใช้ #{parts[1]}"
+        return f"แก้ไขผู้ใช้ #{parts[1]}"
     if len(parts) >= 3 and parts[0] == "tenants" and parts[2] == "documents":
         return f"เพิ่มเอกสารของผู้เช่า #{parts[1]}"
     if len(parts) >= 3 and parts[0] == "contracts" and parts[2] == "checklists":
@@ -35,6 +37,8 @@ def describe(method: str, path: str) -> str:
     if parts[0] == "contract-requests":
         if method == "POST":
             return "แจ้งความจำนง (ต่อ/ยุติสัญญา)"
+        if method == "DELETE" and len(parts) >= 2:
+            return f"ยกเลิกคำแจ้งความจำนง #{parts[1]}"
         if len(parts) >= 2 and parts[1].isdigit():
             return f"ดำเนินการคำแจ้งความจำนง #{parts[1]}"
 

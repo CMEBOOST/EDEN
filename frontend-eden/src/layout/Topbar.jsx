@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { avatarSrc } from "../lib/avatar";
 
 const roleLabel = { admin: "ผู้ดูแลระบบ", staff: "พนักงาน", tenant: "ผู้เช่า" };
 
@@ -20,7 +21,11 @@ function TopBar() {
         </button>
 
         <div className="flex items-center gap-2 border border-gray-200 px-3 py-1.5 rounded-lg">
-          <div className="w-6 h-6 bg-gray-300 rounded-full" />
+          <img
+            src={avatarSrc(user)}
+            alt=""
+            className="w-6 h-6 rounded-full object-cover"
+          />
           <div className="leading-tight">
             <div className="text-sm font-medium text-gray-700">
               {user?.username ?? "-"}

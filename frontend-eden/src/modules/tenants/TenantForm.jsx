@@ -47,11 +47,18 @@ function TenantForm({ tenant, onClose, onSaved }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // โหลดรายชื่อบัญชีผู้ใช้ (ใช้เฉพาะตอนเพิ่มใหม่ — แก้ไขเปลี่ยน user ไม่ได้)
+  // โหลดบัญชีที่ลงทะเบียน tenant ได้: role = tenant, ยังเปิดใช้งาน, และยังไม่ผูกกับผู้เช่ารายอื่น
   useEffect(() => {
     if (isEdit) return;
-    apiGet("/users/")
-      .then(setUsers)
+    Promise.all([apiGet("/users/"), apiGet("/tenants/")])
+      .then(([allUsers, tenants]) => {
+        const taken = new Set(tenants.map((t) => t.user_id));
+        setUsers(
+          allUsers.filter(
+            (u) => u.role === "tenant" && u.is_active && !taken.has(u.user_id)
+          )
+        );
+      })
       .catch(() => setUsers([]));
   }, [isEdit]);
 
@@ -122,20 +129,27 @@ function TenantForm({ tenant, onClose, onSaved }) {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           {!isEdit && (
-            <Field label="บัญชีผู้ใช้ (user)" required>
+            <Field label="บัญชีผู้ใช้" required>
               <select
                 required
                 value={form.user_id}
                 onChange={set("user_id")}
                 className={inputCls}
+                disabled={users.length === 0}
               >
                 <option value="">— เลือกบัญชี —</option>
                 {users.map((u) => (
                   <option key={u.user_id} value={u.user_id}>
-                    {u.username} ({u.role}) · #{u.user_id}
+                    {u.username} · #{u.user_id}
                   </option>
                 ))}
               </select>
+              {users.length === 0 && (
+                <span className="text-xs text-amber-600">
+                  ไม่มีบัญชีผู้เช่าที่ว่าง — สร้างผู้ใช้ role "ผู้เช่า"
+                  ที่หน้าจัดการผู้ใช้ก่อน
+                </span>
+              )}
             </Field>
           )}
 

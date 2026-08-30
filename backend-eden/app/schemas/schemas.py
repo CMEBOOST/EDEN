@@ -23,9 +23,21 @@ class UserOut(BaseModel):
     username: str
     role: Role
     is_active: bool
+    avatar_url: str | None = None
     created_at: datetime.datetime
 
     model_config = {"from_attributes": True}
+
+
+class UserUpdate(BaseModel):
+    """PATCH /users/{id} — ส่งมาเฉพาะ field ที่อยากแก้"""
+    username: str | None = None
+    is_active: bool | None = None
+    avatar_url: str | None = None
+
+
+class PasswordSet(BaseModel):
+    new_password: str
 
 
 class Token(BaseModel):

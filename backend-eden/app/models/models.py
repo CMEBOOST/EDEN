@@ -95,6 +95,8 @@ class Users(TimestampMixin, Base):
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[Role] = mapped_column(_enum_col(Role, "role_enum"))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # null | "admin"/"male"/"female" (พรีเซ็ต) | "/uploads/<file>" (อัปโหลด)
+    avatar_url: Mapped[str | None] = mapped_column(String(500))
 
     # ความสัมพันธ์
     tenants: Mapped[list["Tenants"]] = relationship(back_populates="user")

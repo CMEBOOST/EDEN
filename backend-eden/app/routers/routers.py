@@ -106,17 +106,44 @@ def update_role_route(
 
 
 @router.patch("/{user_id}", response_model=schemas.UserOut)
-def update_active_route(
+def update_user_route(
     user_id: int,
-    data: schemas.UserActiveUpdate,
+    data: schemas.UserUpdate,
     db: Session = Depends(get_db),
     me: models.Users = Depends(require_admin),
 ):
-    if user_id == me.user_id:
+    fields = data.model_dump(exclude_unset=True)
+    if not fields:
+        raise HTTPException(status_code=400, detail="ไม่มีข้อมูลที่จะแก้ไข")
+
+    if "is_active" in fields and user_id == me.user_id:
         raise HTTPException(
             status_code=400, detail="เปิด/ปิดการใช้งานบัญชีตัวเองไม่ได้"
         )
-    user = user_crud.set_active(db, user_id, data.is_active)
+    if "username" in fields:
+        dup = user_crud.get_user_by_username(db, fields["username"])
+        if dup is not None and dup.user_id != user_id:
+            raise HTTPException(status_code=409, detail="username นี้มีอยู่แล้ว")
+
+    user = user_crud.update_user(db, user_id, fields)
+    if user is None:
+        raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    return user
+
+
+@router.patch(
+    "/{user_id}/password",
+    response_model=schemas.UserOut,
+    dependencies=[Depends(require_admin)],
+)
+def set_password_route(
+    user_id: int, data: schemas.PasswordSet, db: Session = Depends(get_db)
+):
+    if len(data.new_password) < 6:
+        raise HTTPException(
+            status_code=400, detail="รหัสผ่านสั้นเกินไป (อย่างน้อย 6 ตัว)"
+        )
+    user = user_crud.set_password(db, user_id, data.new_password)
     if user is None:
         raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
     return user
@@ -141,8 +168,18 @@ tenant_router = APIRouter(prefix="/tenants", tags=["Tenants"], dependencies=_sta
 
 @tenant_router.post("/", dependencies=_staff)
 def create_tenant_route(tenant: schemas.Tenants, db: Session = Depends(get_db)):
-    if user_crud.get_user_by_id(db=db, user_id=tenant.user_id) is None:
+    user = user_crud.get_user_by_id(db=db, user_id=tenant.user_id)
+    if user is None:
         raise HTTPException(status_code=400, detail="ไม่พบ user_id นี้")
+    role = user.role.value if hasattr(user.role, "value") else user.role
+    if role != "tenant":
+        raise HTTPException(
+            status_code=400, detail='บัญชีผู้ใช้ต้องเป็น role "ผู้เช่า" (tenant)'
+        )
+    if tenent_crud.get_tenant_by_user(db=db, user_id=tenant.user_id) is not None:
+        raise HTTPException(
+            status_code=409, detail="บัญชีนี้ลงทะเบียนผู้เช่าไว้แล้ว"
+        )
     return tenent_crud.create_tenant(db=db, tenant=tenant)
 
 
@@ -476,6 +513,32 @@ def update_request_route(
     return request_crud.update_request(
         db=db, request_id=request_id, data=data, handled_by=me.user_id
     )
+
+
+@request_router.delete("/{request_id}")
+def delete_request_route(
+    request_id: int,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(get_current_user),
+):
+    req = request_crud.get_request(db=db, request_id=request_id)
+    if req is None:
+        raise HTTPException(status_code=404, detail="ไม่พบคำแจ้งความจำนง")
+
+    # ผู้เช่ายกเลิกได้เฉพาะคำขอของตัวเองที่ยังไม่ถูกดำเนินการ (แจ้งผิด/มือลั่น)
+    if _role(me) == "tenant":
+        tenant = tenent_crud.get_tenant_by_user(db=db, user_id=me.user_id)
+        contract = contracts_crud.get_contract(db=db, contract_id=req.contract_id)
+        if tenant is None or contract is None or contract.tenant_id != tenant.tenant_id:
+            raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์ยกเลิกคำขอนี้")
+        if req.status != RequestStatus.pending:
+            raise HTTPException(
+                status_code=400,
+                detail="ยกเลิกได้เฉพาะคำขอที่เจ้าหน้าที่ยังไม่รับเรื่อง",
+            )
+
+    request_crud.delete_request(db=db, request_id=request_id)
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

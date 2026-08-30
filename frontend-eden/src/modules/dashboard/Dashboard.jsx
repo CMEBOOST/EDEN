@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, fileUrl } from "../../lib/api";
+import { apiGet, apiDelete, fileUrl } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
+import ConfirmDialog from "../../components/ConfirmDialog";
 import IntentNoticeDialog from "../requests/IntentNoticeDialog";
 import { statusLabel, statusStyle, typeLabel, OPEN_STATUSES } from "../requests/requestMeta";
 
@@ -94,7 +95,7 @@ function StaffAdminDashboard({ data }) {
   );
 }
 
-function RequestStatusBox({ request }) {
+function RequestStatusBox({ request, onCancel }) {
   const open = OPEN_STATUSES.includes(request.status);
   return (
     <div
@@ -102,7 +103,7 @@ function RequestStatusBox({ request }) {
         open ? "bg-amber-50" : "bg-gray-50"
       }`}
     >
-      <span className="flex items-center gap-2">
+      <span className="flex items-center gap-2 flex-wrap">
         <span className="text-gray-600">คำแจ้งความจำนง:</span>
         <span className="font-medium">{typeLabel[request.request_type]}</span>
         <span
@@ -112,7 +113,21 @@ function RequestStatusBox({ request }) {
         >
           {statusLabel[request.status]}
         </span>
+        {request.status === "pending" && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="ml-auto text-xs text-red-600 hover:underline"
+          >
+            ยกเลิกการแจ้ง
+          </button>
+        )}
       </span>
+      {request.status === "pending" && (
+        <span className="text-xs text-gray-400">
+          ยกเลิกได้ก่อนเจ้าหน้าที่รับเรื่อง (เผื่อแจ้งผิด)
+        </span>
+      )}
       {request.staff_note && (
         <span className="text-gray-500">หมายเหตุ: {request.staff_note}</span>
       )}
@@ -123,10 +138,25 @@ function RequestStatusBox({ request }) {
 function TenantDashboard({ data, onReload }) {
   const { tenant, contract, documents, rates, request } = data;
   const [showNotice, setShowNotice] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
   const canNotify =
     contract &&
     contract.status === "active" &&
     !(request && OPEN_STATUSES.includes(request.status));
+
+  async function handleCancel() {
+    setCancelBusy(true);
+    try {
+      await apiDelete(`/contract-requests/${request.request_id}`);
+      setCancelling(false);
+      onReload?.();
+    } catch (e) {
+      alert(`ยกเลิกไม่สำเร็จ: ${e.message}`);
+    } finally {
+      setCancelBusy(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-5 font-sans max-w-2xl">
@@ -168,7 +198,12 @@ function TenantDashboard({ data, onReload }) {
             </a>
           )}
 
-          {request && <RequestStatusBox request={request} />}
+          {request && (
+            <RequestStatusBox
+              request={request}
+              onCancel={() => setCancelling(true)}
+            />
+          )}
 
           {canNotify && (
             <button
@@ -191,6 +226,20 @@ function TenantDashboard({ data, onReload }) {
           contractId={contract.contract_id}
           onClose={() => setShowNotice(false)}
           onDone={onReload}
+        />
+      )}
+
+      {cancelling && (
+        <ConfirmDialog
+          title="ยกเลิกการแจ้งความจำนง"
+          message={`ยกเลิกคำแจ้ง "${
+            typeLabel[request.request_type]
+          }" ใช่หรือไม่? หากยกเลิกแล้วต้องแจ้งใหม่`}
+          confirmText="ยกเลิกการแจ้ง"
+          danger
+          busy={cancelBusy}
+          onConfirm={handleCancel}
+          onClose={() => setCancelling(false)}
         />
       )}
 

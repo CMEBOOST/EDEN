@@ -131,6 +131,15 @@ def update_request(
     return req
 
 
+def delete_request(db: Session, request_id: int) -> models.ContractRequest | None:
+    req = get_request(db, request_id)
+    if req is None:
+        return None
+    db.delete(req)
+    db.commit()
+    return req
+
+
 def latest_for_tenant(db: Session, tenant_id: int) -> models.ContractRequest | None:
     return (
         db.query(models.ContractRequest)

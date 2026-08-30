@@ -41,8 +41,8 @@ function Sidebar() {
             <Link to="/rate" className={linkCls}>
               💵 อัตราค่าบริการ
             </Link>
-            <Link to="/permission" className={linkCls}>
-              🔐 จัดการสิทธ์
+            <Link to="/users" className={linkCls}>
+              👥 จัดการผู้ใช้
             </Link>
             <Link to="/log" className={linkCls}>
               🪵 Audit Log

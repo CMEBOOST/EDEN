@@ -93,12 +93,16 @@ function App() {
               }
             />
             <Route
-              path="/permission"
+              path="/users"
               element={
                 <RequireAuth roles={["admin"]}>
                   <Users />
                 </RequireAuth>
               }
+            />
+            <Route
+              path="/permission"
+              element={<Navigate to="/users" replace />}
             />
             <Route
               path="/log"
