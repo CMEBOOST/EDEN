@@ -1,5 +1,6 @@
 import datetime
 import enum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sqlalchemy import (
     Boolean,
@@ -11,9 +12,9 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
     func,
 )
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
 
@@ -189,6 +190,10 @@ class ContractChecklist(TimestampMixin, Base):
 # ---------------------------------------------------------------------------
 class RateConfig(TimestampMixin, Base):
     __tablename__ = "rate_configs"
+    # 1 อัตราต่อ 1 ประเภท ต่อ 1 วันมีผล — กันตั้งซ้อนวันเดียวกัน
+    __table_args__ = (
+        UniqueConstraint("type", "effective_date", name="uq_rate_type_date"),
+    )
 
     rate_id: Mapped[int] = mapped_column(primary_key=True, index=True)
     type: Mapped[RateType] = mapped_column(_enum_col(RateType, "rate_type_enum"))

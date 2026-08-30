@@ -61,8 +61,9 @@ EDEN/
 │   │   ├── pages/        # Home.jsx, About.jsx, Menu.jsx
 │   │   └── modules/
 │   │       ├── tenants/   Tenants.jsx (list+CRUD), TenantForm.jsx
-│   │       └── contracts/ Contracts.jsx (list), ContractForm.jsx (/contracts/new — 3 ส่วน),
-│   │                      ChecklistEditor.jsx, DocumentUploader.jsx
+│   │       ├── contracts/ Contracts.jsx (list+แก้/ลบ), ContractForm.jsx (/contracts/new — 3 ส่วน),
+│   │       │              ContractEditForm.jsx, ChecklistEditor.jsx, DocumentUploader.jsx
+│   │       └── rates/     Rates.jsx (list+CRUD ค่าน้ำ/ค่าไฟ), RateForm.jsx
 │   ├── Dockerfile
 │   └── package.json / vite.config.js
 │
@@ -89,7 +90,7 @@ Source of truth = [backend-eden/app/models/models.py](backend-eden/app/models/mo
 | `tenant_documents` | doc_id | doc_type, file_url | tenant_id → tenants, uploaded_by → users |
 | `contracts` | contract_id | start/end_date, rent, security_deposit, status, room_id* | tenant_id → tenants, created_by → users |
 | `contract_checklists` | cc_id | type (check-in/out), checklist_items (JSON), photo_urls (JSON), tenant_signature | contract_id → contracts, created_by → users |
-| `rate_configs` | rate_id | type (water/electric), rate_value, effective_date | created_by → users |
+| `rate_configs` | rate_id | type (water/electric), rate_value, effective_date · **UNIQUE(type, effective_date)** | created_by → users |
 | `audit_logs` | log_id | action, created_at | user_id → users |
 
 \* `room_id` ยังเป็น nullable ไม่มี FK — ตาราง `rooms` ยังไม่ทำ (Demo)
@@ -122,6 +123,9 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | POST/GET | `/contracts/` | สร้าง / list (query `tenant_id`) · create เช็ค tenant + วันที่ |
 | GET/PUT/DELETE | `/contracts/{id}` | อ่าน / แก้ (`ContractUpdate`) / ลบ |
 | POST/GET | `/contracts/{id}/checklists` | บันทึกสภาพห้อง — `{type, items:[{name,status,note,photos}], tenant_signature?}` → เก็บ `checklist_items` (JSON) + `photo_urls` (flat) |
+| POST/GET | `/rates/` | อัตราค่าน้ำ/ค่าไฟ (`{type: water\|electric, rate_value, effective_date}`) · query `type` · POST ชน `(type, effective_date)` เดิม → **409** `{message, existing_rate_id}` |
+| GET | `/rates/current` | อัตราที่มีผล ณ วันนี้ (หรือ `?date=`) → `{water: {...}\|null, electric: {...}\|null}` |
+| GET/PUT/DELETE | `/rates/{rate_id}` | อ่าน / แก้ (`RateConfigUpdate`, PUT เข้า slot ที่มีแล้ว → 409) / ลบ |
 
 > ยังไม่มี response schema แยก — บาง endpoint คืน field ที่ไม่ควรโชว์ (`password_hash`, `national_id_encrypted`)
 > ยังไม่มี auth → `created_by` / `uploaded_by` เป็น `null`
@@ -183,6 +187,7 @@ npm run dev
 - schema changes → แก้ `models.py` แล้ว `uv run alembic revision --autogenerate -m "..."` → `alembic upgrade head`
 - **เวลา**: DB เก็บ `timestamptz` เต็ม ๆ (UTC) — จัดรูปแบบตอนแสดงผลที่ frontend (`utils/datetime.js`, timezone Asia/Bangkok)
 - password: `hash_password()` / `verify_password()` จาก `app/core/security.py` เท่านั้น อย่าเก็บ plaintext
+- **rate_configs = effective-dated history**: แต่ละแถว = "ตั้งแต่ `effective_date` เรทคือ X" · หลายแถวต่อ type = ประวัติ (ปกติ) · แถวใหม่ปิดแถวเก่าเอง ไม่มี `end_date` · อัตราปัจจุบัน = `effective_date` ล่าสุดที่ ≤ วันนี้ (ใช้ `GET /rates/current` หรือ `rate_crud.get_effective_rate`)
 - git: commit ท้ายข้อความใส่ `Co-Authored-By: Claude ...` เมื่อใช้ AI ช่วย
 
 ---
@@ -190,8 +195,8 @@ npm run dev
 ## 9. สถานะ / สิ่งที่ยังต้องทำ (TODO)
 
 **Backend**
-- [x] endpoint: users / tenants / contracts / documents / checklists / upload
-- [ ] endpoint: rate_configs / audit_logs
+- [x] endpoint: users / tenants / contracts / documents / checklists / upload / rates
+- [ ] endpoint: audit_logs
 - [ ] auth จริง (login, JWT / session) — ตอนนี้มีแค่ hash password · `created_by`/`uploaded_by` ยัง `null`
 - [ ] response schema แยก (`UserOut` ฯลฯ) — `/users/` คืน `password_hash`, `/tenants/` คืน `national_id_encrypted` ⚠️
 - [ ] `crud.create_user` ควรคืนแค่ `{"create": "ok"}` (มีคอมเมนต์ไว้แล้ว)
@@ -202,9 +207,9 @@ npm run dev
 - [ ] เขียน tests
 
 **Frontend**
-- [x] ต่อ API จริง (`utils/api.js`), หน้า Tenants (list/CRUD), หน้า Contracts (list), ContractForm
-- [ ] Contracts: ปุ่ม แก้ไข/ลบ ในตารางยังไม่ทำ · หน้า contract detail (ดู checklist/เอกสาร)
-- [ ] หน้า rate config, dashboard
+- [x] ต่อ API จริง (`lib/api.js`), หน้า Tenants / Contracts / Rates (list + เพิ่ม/แก้/ลบ), ContractForm
+- [ ] หน้า contract detail (ดู/แก้ checklist + เอกสารของสัญญา)
+- [ ] dashboard (หน้าแรกยัง placeholder)
 - [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)
 
 **Infra**

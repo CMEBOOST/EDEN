@@ -1,3 +1,5 @@
+import datetime
+
 from sqlalchemy.orm import Session
 
 from ..models import models
@@ -28,6 +30,30 @@ def get_rate(db: Session, rate_id: int):
     return (
         db.query(models.RateConfig)
         .filter(models.RateConfig.rate_id == rate_id)
+        .first()
+    )
+
+
+def get_effective_rate(db: Session, type_: str, on_date: datetime.date):
+    """อัตราที่มีผล ณ วันที่ on_date = effective_date ล่าสุดที่ <= on_date"""
+    return (
+        db.query(models.RateConfig)
+        .filter(
+            models.RateConfig.type == type_,
+            models.RateConfig.effective_date <= on_date,
+        )
+        .order_by(models.RateConfig.effective_date.desc())
+        .first()
+    )
+
+
+def rate_exists(db: Session, type_: str, effective_date: datetime.date):
+    return (
+        db.query(models.RateConfig)
+        .filter(
+            models.RateConfig.type == type_,
+            models.RateConfig.effective_date == effective_date,
+        )
         .first()
     )
 

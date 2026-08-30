@@ -1,7 +1,10 @@
+import datetime
+
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from ..core.storage import save_upload
+from ..models.models import RateType
 from ..crud import (
     checklist_crud,
     contracts_crud,
@@ -193,12 +196,33 @@ rate_router = APIRouter(prefix="/rates", tags=["Rates"])
 
 @rate_router.post("/")
 def create_rate_route(rate: schemas.RateConfig, db: Session = Depends(get_db)):
+    dup = rate_crud.rate_exists(db, rate.type, rate.effective_date)
+    if dup is not None:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"มีอัตรา {rate.type.value} สำหรับวันที่ {rate.effective_date} อยู่แล้ว",
+                "existing_rate_id": dup.rate_id,
+            },
+        )
     return rate_crud.create_rate(db=db, rate=rate)
 
 
 @rate_router.get("/")
 def list_rates_route(type: str | None = None, db: Session = Depends(get_db)):
     return rate_crud.get_rates(db=db, type_=type)
+
+
+@rate_router.get("/current")
+def current_rates_route(
+    date: datetime.date | None = None, db: Session = Depends(get_db)
+):
+    """อัตราที่มีผล ณ วันที่ที่ระบุ (ไม่ระบุ = วันนี้) แยกตามประเภท"""
+    on_date = date or datetime.date.today()
+    return {
+        t.value: rate_crud.get_effective_rate(db, t.value, on_date)
+        for t in RateType
+    }
 
 
 @rate_router.get("/{rate_id}")
@@ -213,10 +237,22 @@ def get_rate_route(rate_id: int, db: Session = Depends(get_db)):
 def update_rate_route(
     rate_id: int, data: schemas.RateConfigUpdate, db: Session = Depends(get_db)
 ):
-    rate = rate_crud.update_rate(db=db, rate_id=rate_id, data=data)
-    if rate is None:
+    current = rate_crud.get_rate(db=db, rate_id=rate_id)
+    if current is None:
         raise HTTPException(status_code=404, detail="ไม่พบอัตราค่าบริการ")
-    return rate
+
+    new_type = data.type or current.type
+    new_date = data.effective_date or current.effective_date
+    dup = rate_crud.rate_exists(db, new_type, new_date)
+    if dup is not None and dup.rate_id != rate_id:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": f"มีอัตรา {new_type.value} สำหรับวันที่ {new_date} อยู่แล้ว",
+                "existing_rate_id": dup.rate_id,
+            },
+        )
+    return rate_crud.update_rate(db=db, rate_id=rate_id, data=data)
 
 
 @rate_router.delete("/{rate_id}")

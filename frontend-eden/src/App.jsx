@@ -6,6 +6,7 @@ import Menu from './pages/Menu';
 import Contracts from './modules/contracts/Contracts';
 import ContractForm from './modules/contracts/ContractForm';
 import Tenants from './modules/tenants/Tenants';
+import Rates from './modules/rates/Rates';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
                 <Route path="/tenants" element={<Tenants />} />
                 <Route path="/contracts" element={<Contracts />} />
                 <Route path="/contracts/new" element={<ContractForm />} />
+                <Route path="/rate" element={<Rates />} />
               </Routes>
             </div>
 

@@ -26,7 +26,7 @@ function ConfirmDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="text-sm text-gray-600">{message}</p>
+        <p className="text-sm text-gray-600 whitespace-pre-line">{message}</p>
 
         <div className="flex justify-end gap-2 mt-2">
           <button

@@ -10,7 +10,12 @@ async function request(path, options) {
     } catch {
       /* ไม่ใช่ JSON */
     }
-    throw new Error(`${res.status}: ${detail}`);
+    // FastAPI ส่ง detail เป็น string หรือ object ก็ได้
+    const msg = typeof detail === "string" ? detail : detail.message ?? "เกิดข้อผิดพลาด";
+    const err = new Error(`${res.status}: ${msg}`);
+    err.status = res.status;
+    err.detail = detail; // object เต็ม (เช่น {message, existing_rate_id})
+    throw err;
   }
   if (res.status === 204) return null;
   return res.json();
