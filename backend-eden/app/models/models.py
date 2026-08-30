@@ -13,12 +13,12 @@ from sqlalchemy import (
     Text,
     func,
 )
-
-# เก็บเวลาเต็ม (UTC + timezone) — การจัดรูปแบบให้อ่านง่ายทำที่ฝั่งแสดงผล
-Timestamp = DateTime(timezone=True)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..database import Base
+
+# เก็บเวลาเต็ม (UTC + timezone) — การจัดรูปแบบให้อ่านง่ายทำที่ฝั่งแสดงผล
+Timestamp = DateTime(timezone=True)
 
 
 def _enum_col(python_enum, name):

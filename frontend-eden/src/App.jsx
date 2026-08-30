@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Sidebar from './Sidebar';
-import TopBar from './Topbar';
-import Home from './Home';
-import Menu from './Menu';
-import Contracts from './Contracts';
+import Sidebar from './layout/Sidebar';
+import TopBar from './layout/Topbar';
+import Home from './pages/Home';
+import Menu from './pages/Menu';
+import Contracts from './modules/contracts/Contracts';
+import ContractForm from './modules/contracts/ContractForm';
+import Tenants from './modules/tenants/Tenants';
 
 function App() {
   return (
@@ -29,8 +31,9 @@ function App() {
                 <Route path="/" element={<Home />} />
                 <Route path="/menu" element={<Menu />} />
                 {/* สร้างหน้าอื่นๆ ไว้รอได้เลย */}
-                <Route path="/tenants" element={<h1 className="text-2xl font-bold">หน้าผู้เช่า</h1>} />
+                <Route path="/tenants" element={<Tenants />} />
                 <Route path="/contracts" element={<Contracts />} />
+                <Route path="/contracts/new" element={<ContractForm />} />
               </Routes>
             </div>
 

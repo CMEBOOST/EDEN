@@ -1,0 +1,67 @@
+from sqlalchemy.orm import Session
+
+from ..models import models
+from ..schemas import schemas
+
+
+def create_contract(db: Session, contract: schemas.Contracts):
+    new_contract = models.Contracts(
+        tenant_id=contract.tenant_id,
+        room_id=contract.room_id,
+        start_date=contract.start_date,
+        end_date=contract.end_date,
+        rent=contract.rent,
+        security_deposit=contract.security_deposit,
+        contract_file_url=contract.contract_file_url,
+        special_conditions=contract.special_conditions,
+        status=contract.status,
+        created_by=contract.created_by,
+    )
+    db.add(new_contract)
+    db.commit()
+    db.refresh(new_contract)
+    return new_contract
+
+
+def get_contracts(
+    db: Session,
+    skip: int = 0,
+    limit: int = 10,
+    tenant_id: int | None = None,
+):
+    query = db.query(models.Contracts)
+    if tenant_id is not None:
+        query = query.filter(models.Contracts.tenant_id == tenant_id)
+    return query.offset(skip).limit(limit).all()
+
+
+def get_contract(db: Session, contract_id: int):
+    return (
+        db.query(models.Contracts)
+        .filter(models.Contracts.contract_id == contract_id)
+        .first()
+    )
+
+
+def update_contract(db: Session, contract_id: int, data: schemas.ContractUpdate):
+    contract = get_contract(db, contract_id)
+    if contract is None:
+        return None
+
+    # อัปเดตเฉพาะ field ที่ส่งมา
+    for field, value in data.model_dump(exclude_unset=True).items():
+        setattr(contract, field, value)
+
+    db.commit()
+    db.refresh(contract)
+    return contract
+
+
+def delete_contract(db: Session, contract_id: int):
+    contract = get_contract(db, contract_id)
+    if contract is None:
+        return None
+
+    db.delete(contract)
+    db.commit()
+    return contract

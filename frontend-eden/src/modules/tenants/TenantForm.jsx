@@ -1,0 +1,218 @@
+import { useEffect, useState } from "react";
+import { apiGet, apiPost, apiPut } from "../../lib/api";
+
+const EMPTY = {
+  user_id: "",
+  full_name: "",
+  phone: "",
+  email: "",
+  current_address: "",
+  national_id_encrypted: "",
+  emergency_contact: "",
+};
+
+const inputCls =
+  "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
+
+function Field({ label, required, children }) {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="text-gray-600">
+        {label}
+        {required && <span className="text-red-500"> *</span>}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+// tenant = null -> โหมดเพิ่ม, tenant = object -> โหมดแก้ไข
+function TenantForm({ tenant, onClose, onSaved }) {
+  const isEdit = Boolean(tenant);
+
+  const [form, setForm] = useState(() =>
+    isEdit
+      ? {
+          user_id: String(tenant.user_id ?? ""),
+          full_name: tenant.full_name ?? "",
+          phone: tenant.phone ?? "",
+          email: tenant.email ?? "",
+          current_address: tenant.current_address ?? "",
+          national_id_encrypted: tenant.national_id_encrypted ?? "",
+          emergency_contact: tenant.emergency_contact ?? "",
+        }
+      : EMPTY
+  );
+  const [users, setUsers] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  // โหลดรายชื่อบัญชีผู้ใช้ (ใช้เฉพาะตอนเพิ่มใหม่ — แก้ไขเปลี่ยน user ไม่ได้)
+  useEffect(() => {
+    if (isEdit) return;
+    apiGet("/users/")
+      .then(setUsers)
+      .catch(() => setUsers([]));
+  }, [isEdit]);
+
+  // ปิดด้วยปุ่ม Esc
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose?.();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const set = (key) => (e) =>
+    setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const common = {
+        full_name: form.full_name.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        current_address: form.current_address.trim() || null,
+        national_id_encrypted: form.national_id_encrypted.trim() || null,
+        emergency_contact: form.emergency_contact.trim() || null,
+      };
+
+      const saved = isEdit
+        ? await apiPut(`/tenants/${tenant.tenant_id}`, common)
+        : await apiPost("/tenants/", { ...common, user_id: Number(form.user_id) });
+
+      onSaved?.(saved);
+      onClose?.();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center">
+          <h3 className="text-xl font-semibold">
+            {isEdit ? "แก้ไขผู้เช่า" : "เพิ่มผู้เช่า"}
+          </h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+          >
+            &times;
+          </button>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 text-red-700 text-sm rounded px-3 py-2">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          {!isEdit && (
+            <Field label="บัญชีผู้ใช้ (user)" required>
+              <select
+                required
+                value={form.user_id}
+                onChange={set("user_id")}
+                className={inputCls}
+              >
+                <option value="">— เลือกบัญชี —</option>
+                {users.map((u) => (
+                  <option key={u.user_id} value={u.user_id}>
+                    {u.username} ({u.role}) · #{u.user_id}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          <Field label="ชื่อ-สกุล" required>
+            <input
+              required
+              value={form.full_name}
+              onChange={set("full_name")}
+              className={inputCls}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="เบอร์โทร" required>
+              <input
+                required
+                value={form.phone}
+                onChange={set("phone")}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="อีเมล" required>
+              <input
+                required
+                type="email"
+                value={form.email}
+                onChange={set("email")}
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          <Field label="ที่อยู่ปัจจุบัน">
+            <input
+              value={form.current_address}
+              onChange={set("current_address")}
+              className={inputCls}
+            />
+          </Field>
+
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="เลขบัตรประชาชน">
+              <input
+                value={form.national_id_encrypted}
+                onChange={set("national_id_encrypted")}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="ผู้ติดต่อฉุกเฉิน">
+              <input
+                value={form.emergency_contact}
+                onChange={set("emergency_contact")}
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+            >
+              {submitting ? "กำลังบันทึก..." : "บันทึก"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default TenantForm;

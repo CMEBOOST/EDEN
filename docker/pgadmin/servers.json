@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "EDEN (docker)",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "EDEN_DB",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "auto-provision จาก docker/pgadmin/servers.json"
+    }
+  }
+}

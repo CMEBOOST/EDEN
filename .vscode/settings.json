@@ -1,0 +1,14 @@
+{
+  // backend เป็นโปรเจกต์ Python ที่อยู่ในโฟลเดอร์ย่อย backend-eden/
+  // ต้องชี้ interpreter ไป venv ในนั้น ไม่งั้น import (sqlalchemy, app.*) จะ unresolved
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend-eden/.venv/Scripts/python.exe",
+  "python.analysis.extraPaths": ["${workspaceFolder}/backend-eden"],
+  "python.analysis.typeCheckingMode": "basic",
+  "python.analysis.autoSearchPaths": true,
+  "python.terminal.activateEnvironment": true,
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true
+  }
+}

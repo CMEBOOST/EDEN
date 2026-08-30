@@ -55,7 +55,9 @@ htmlcov/
 # Editors / OS
 # -----------------------------
 .idea/
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
 .DS_Store
 Thumbs.db
 
@@ -66,6 +68,12 @@ Thumbs.db
 *.sqlite3
 postgres-data/
 pgadmin-data/
+
+# -----------------------------
+# ไฟล์อัปโหลด (รูป checklist / เอกสาร)
+# -----------------------------
+backend-eden/uploads/*
+!backend-eden/uploads/.gitkeep
 
 # -----------------------------
 # Front-end (if used inside Front-End)

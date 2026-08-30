@@ -10,7 +10,9 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - ./postgres-data:/var/lib/postgresql/data
+      # named volume (Docker จัดการเอง) — ทนกว่า bind mount บน Windows
+      # ลบเฉพาะเมื่อสั่ง `docker compose down -v` หรือ `docker volume rm` เท่านั้น
+      - postgres-data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d EDEN_DB"]
       interval: 5s
@@ -26,10 +28,13 @@ services:
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin123
+      # ลงทะเบียน server EDEN ให้อัตโนมัติ (ไม่ต้อง add เองทุกครั้ง)
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
     ports:
       - "5050:80"
     volumes:
-      - ./pgadmin-data:/var/lib/pgadmin
+      - pgadmin-data:/var/lib/pgadmin
+      - ./docker/pgadmin/servers.json:/pgadmin4/servers.json:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -67,3 +72,7 @@ services:
 networks:
   eden-network:
     driver: bridge
+
+volumes:
+  postgres-data:
+  pgadmin-data:
