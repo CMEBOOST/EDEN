@@ -64,6 +64,8 @@ Thumbs.db
 # -----------------------------
 *.db
 *.sqlite3
+postgres-data/
+pgadmin-data/
 
 # -----------------------------
 # Front-end (if used inside Front-End)

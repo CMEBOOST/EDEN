@@ -1,0 +1,69 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: eden-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+      POSTGRES_DB: EDEN_DB
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d EDEN_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - eden-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: eden-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5050:80"
+    volumes:
+      - ./pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - eden-network
+
+  backend:
+    build: ./backend-eden
+    container_name: eden-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # ต่อ DB ผ่านชื่อ service ภายใน network (พอร์ตภายในคือ 5432)
+      DATABASE_URL: postgresql://postgres:admin123@postgres:5432/EDEN_DB
+    volumes:
+      - ./backend-eden:/app     # map โค้ดเข้าไป (hot reload ผ่าน --reload ได้)
+      - /app/.venv              # กัน .venv ในเครื่องไปทับของใน container
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - eden-network
+
+  frontend:
+    build: ./frontend-eden
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend-eden:/app               # Map ไฟล์ในเครื่องเรา เข้าไปใน /app ของ Container
+      - /app/node_modules    # ป้องกันไม่ให้ node_modules ในเครื่องไปทับใน Container
+    environment:
+      - CHOKIDAR_USEPOLLING=true # ช่วยให้ Hot Reload ทำงานได้ดีขึ้นบนบาง OS (เช่น Windows WSL)
+
+networks:
+  eden-network:
+    driver: bridge
