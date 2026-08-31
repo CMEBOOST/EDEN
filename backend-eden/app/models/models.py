@@ -149,6 +149,20 @@ class TenantDocument(TimestampMixin, Base):
 
 
 # ---------------------------------------------------------------------------
+# Rooms — ห้องพัก (demo: seed คงที่ 101-110 / 201-210 / 301-310 / 401-410)
+# room_id = เลขห้องเอง · สถานะว่าง/ไม่ว่าง คำนวณสดจาก contracts ไม่เก็บในตารางนี้
+# ---------------------------------------------------------------------------
+class Room(Base):
+    __tablename__ = "rooms"
+
+    room_id: Mapped[int] = mapped_column(primary_key=True)  # = เลขห้อง
+    floor: Mapped[int] = mapped_column(index=True)
+    base_rent: Mapped[float] = mapped_column(Numeric(10, 2))
+
+    contracts: Mapped[list["Contracts"]] = relationship(back_populates="room")
+
+
+# ---------------------------------------------------------------------------
 # Contracts
 # ---------------------------------------------------------------------------
 class Contracts(TimestampMixin, Base):
@@ -159,8 +173,11 @@ class Contracts(TimestampMixin, Base):
     tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.tenant_id"), index=True)
     tenant: Mapped["Tenants"] = relationship(back_populates="contracts")
 
-    # room_id ยังเป็น Demo (ยังไม่มีตาราง rooms) — เก็บไว้ก่อนแบบ nullable
-    room_id: Mapped[int | None] = mapped_column(index=True)
+    # ผูกกับห้อง (ตาราง rooms = demo, เลขห้อง = PK) · nullable = สัญญาไม่ระบุห้องได้
+    room_id: Mapped[int | None] = mapped_column(
+        ForeignKey("rooms.room_id", ondelete="SET NULL"), index=True
+    )
+    room: Mapped["Room | None"] = relationship(back_populates="contracts")
 
     start_date: Mapped[datetime.date] = mapped_column(Date)
     end_date: Mapped[datetime.date] = mapped_column(Date)

@@ -20,6 +20,7 @@ from ..crud import (
     document_crud,
     rate_crud,
     request_crud,
+    room_crud,
     tenent_crud,
     user_crud,
 )
@@ -262,6 +263,15 @@ def create_contract_route(contract: schemas.Contracts, db: Session = Depends(get
         raise HTTPException(status_code=400, detail="ไม่พบ created_by (user_id) นี้")
     if contract.end_date < contract.start_date:
         raise HTTPException(status_code=400, detail="end_date ต้องไม่ก่อน start_date")
+    if contract.room_id is not None:
+        if not room_crud.room_exists(db=db, room_id=contract.room_id):
+            raise HTTPException(status_code=400, detail="ไม่พบห้องนี้")
+        busy = room_crud.active_contract_for_room(db=db, room_id=contract.room_id)
+        if busy is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"ห้อง {contract.room_id} มีสัญญาอยู่แล้ว (#{busy})",
+            )
     return contracts_crud.create_contract(db=db, contract=contract)
 
 
@@ -296,6 +306,17 @@ def update_contract_route(
     # ยุติสัญญา (terminated) = เฉพาะ admin (UC3.5)
     if data.status == ContractStatus.terminated and me.role != models.Role.admin:
         raise HTTPException(status_code=403, detail="เฉพาะผู้ดูแลระบบยุติสัญญาได้")
+    if data.room_id is not None:
+        if not room_crud.room_exists(db=db, room_id=data.room_id):
+            raise HTTPException(status_code=400, detail="ไม่พบห้องนี้")
+        busy = room_crud.active_contract_for_room(
+            db=db, room_id=data.room_id, exclude_contract_id=contract_id
+        )
+        if busy is not None:
+            raise HTTPException(
+                status_code=409,
+                detail=f"ห้อง {data.room_id} มีสัญญาอยู่แล้ว (#{busy})",
+            )
     contract = contracts_crud.update_contract(db=db, contract_id=contract_id, data=data)
     if contract is None:
         raise HTTPException(status_code=404, detail="ไม่พบสัญญา")
@@ -315,9 +336,24 @@ def delete_contract_route(contract_id: int, db: Session = Depends(get_db)):
 def create_checklist_route(
     contract_id: int, data: schemas.ChecklistCreate, db: Session = Depends(get_db)
 ):
-    if contracts_crud.get_contract(db=db, contract_id=contract_id) is None:
+    contract = contracts_crud.get_contract(db=db, contract_id=contract_id)
+    if contract is None:
         raise HTTPException(status_code=404, detail="ไม่พบสัญญา")
-    return checklist_crud.create_checklist(db=db, contract_id=contract_id, data=data)
+
+    checklist = checklist_crud.create_checklist(
+        db=db, contract_id=contract_id, data=data
+    )
+
+    # ตรวจคืนห้อง (check-out) = สิ้นสุดกระบวนการเช่า → ยุติสัญญาอัตโนมัติ
+    # เฉพาะสัญญาที่ยัง draft/active (expired คงไว้) · staff ทำได้เลย ไม่ต้องรอ admin
+    if data.type == ChecklistType.check_out and contract.status in (
+        ContractStatus.draft,
+        ContractStatus.active,
+    ):
+        contract.status = ContractStatus.terminated
+        db.commit()
+
+    return checklist
 
 
 @contract_router.get("/{contract_id}/checklists")
@@ -347,6 +383,27 @@ def delete_checklist_route(
         raise HTTPException(status_code=404, detail="ไม่พบบันทึกสภาพห้อง")
     checklist_crud.delete_checklist(db=db, cc_id=cc_id)
     return {"delete": "ok"}
+
+
+# ---------------------------------------------------------------------------
+# Rooms (ห้องพัก — demo, seed คงที่ · สถานะว่าง/ไม่ว่างคำนวณสดจากสัญญา)
+# ---------------------------------------------------------------------------
+room_router = APIRouter(prefix="/rooms", tags=["Rooms"], dependencies=_staff)
+
+
+@room_router.get("/", response_model=list[schemas.RoomOut])
+def list_rooms_route(available: bool = False, db: Session = Depends(get_db)):
+    rows = room_crud.get_rooms(db=db, available_only=available)
+    return [
+        schemas.RoomOut(
+            room_id=room.room_id,
+            floor=room.floor,
+            base_rent=float(room.base_rent),
+            status="occupied" if contract_id else "available",
+            contract_id=contract_id,
+        )
+        for room, contract_id in rows
+    ]
 
 
 # ---------------------------------------------------------------------------

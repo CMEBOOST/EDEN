@@ -1,9 +1,9 @@
 # EDEN — โมดูลในระบบ (Module Overview)
 
 สรุปว่าตอนนี้ระบบมีโมดูลอะไรบ้าง แต่ละโมดูล **ทำอะไรได้จริงแล้ว** และ **ยังขาดอะไร**
-อัปเดต: 2026-08-31 · อ้างอิงจากโค้ดใน `backend-eden/` และ `frontend-eden/` ณ commit `063badc`
+อัปเดต: 2026-09-01 · อ้างอิงจากโค้ดใน `backend-eden/` และ `frontend-eden/`
 
-ภาพรวมอื่น ๆ ดูที่ [`context.md`](../context.md) (โครงโปรเจกต์ + วิธีรัน) และ [`database_erd.drawio`](database_erd.drawio) (ERD)
+ภาพรวมอื่น ๆ ดูที่ [`context.md`](../context.md) (โครงโปรเจกต์ + วิธีรัน) และ [`database_erd.drawio`](database_erd.drawio) (ERD — 9 ตาราง, อัปเดตตรงกับ schema ปัจจุบัน)
 
 ---
 
@@ -16,7 +16,8 @@
 | 3 | Profile (โปรไฟล์ตัวเอง) | `/profile/*` | `modules/profile/` | ทุก role |
 | 4 | Tenants (ผู้เช่า) | `/tenants/*` | `modules/tenants/` | staff+ (ลบ = admin) |
 | 5 | Documents (เอกสารผู้เช่า) | `/tenants/{id}/documents`, `/documents/*` | `modules/contracts/DocumentUploader.jsx` | staff+ |
-| 6 | Contracts (สัญญาเช่า) | `/contracts/*` | `modules/contracts/` | staff+ (ลบ/ยุติ = admin) |
+| 6 | Contracts (สัญญาเช่า) | `/contracts/*` | `modules/contracts/` | staff+ (ลบ = admin) |
+| 6.5 | Rooms (ห้องพัก — demo) | `/rooms/` | เลือกในฟอร์มสร้าง/แก้สัญญา | staff+ |
 | 7 | Checklists (ตรวจสภาพห้อง) | `/contracts/{id}/checklists` (+ PATCH/DELETE `/{cc_id}`) | `ChecklistEditor.jsx`, `ChecklistSection.jsx`, `CheckoutInspection.jsx` | staff+ |
 | 8 | Contract Requests (แจ้งความจำนง) | `/contract-requests/*` | `modules/requests/` | tenant แจ้ง / staff+ ดำเนินการ |
 | 9 | Rates (อัตราค่าน้ำ-ไฟ) | `/rates/*` | `modules/rates/` | admin (list = staff+, current = ทุกคน) |
@@ -125,23 +126,45 @@
 - `GET /contracts/{id}` (staff+) — รายสัญญา
 - `PUT /contracts/{id}` (staff+) — แก้ (`ContractUpdate`)
   - **ต่อสัญญา** = แก้ `end_date`
-  - ตั้ง `status=terminated` (**ยุติสัญญา**) = **admin เท่านั้น** (staff → 403)
+  - ตั้ง `status=terminated` ด้วยมือ = **admin เท่านั้น** (staff → 403) — แต่ปกติไม่ต้องใช้ เพราะ **การบันทึก checklist `check-out` จะยุติสัญญาให้อัตโนมัติ** (ดูโมดูล 7)
 - `DELETE /contracts/{id}` (admin) — ลบสัญญา (hard delete)
-- ฟิลด์: `start/end_date`, `rent`, `security_deposit`, `contract_file_url`, `special_conditions`, `status`, `room_id`
+- ฟิลด์: `start/end_date`, `rent`, `security_deposit`, `contract_file_url`, `special_conditions`, `status`, `room_id` (FK → `rooms`, nullable)
+- ผูกห้อง (`room_id`): ตอน `POST` / `PUT` เช็คว่าห้องมีจริง (ไม่มี → 400) และไม่มีสัญญาอื่น `status ∈ (draft, active)` ครองห้องนั้นอยู่ (มี → **409**)
 - Frontend:
   - หน้า `/contracts` (staff+) — ตาราง **เฉพาะสัญญาที่ยังไม่เสร็จสิ้น** (`?finished=false`) · คลิกแถว / ปุ่ม "รายละเอียด" ไปหน้า detail · ลบ (admin) · `<RequestPanel>` · ปุ่ม "ประวัติสัญญาเช่า" (ข้างปุ่มเพิ่มสัญญา) → `/contracts/history`
   - หน้า `/contracts/history` (`ContractHistory`, staff+) — ตารางสัญญาที่ **เสร็จสิ้นแล้ว** (มี checklist `check-out`, `?finished=true`) · คลิกแถว → `/contracts/history/:id`
-  - หน้า `/contracts/new` ฟอร์ม 3 ส่วน (ข้อมูลสัญญา + checklist check-in + เอกสาร)
+  - หน้า `/contracts/new` ฟอร์ม 3 ส่วน (ข้อมูลสัญญา + checklist check-in + เอกสาร) · ช่อง "ห้อง" = dropdown ห้องว่าง (`/rooms/?available=true`) · เลือกห้อง → เติมค่าเช่า = `base_rent` ให้ (แก้ต่อได้)
   - หน้า `/contracts/:id` (`ContractDetail`) — ดู/แก้ข้อมูลสัญญา (inline, PUT) + จัดการ checklist ทุกใบ (เพิ่ม/แก้/ลบ) + เอกสารของผู้เช่า (เพิ่ม/ลบ) · การแก้สัญญาย้ายมาที่นี่ทั้งหมด (เดิม modal `ContractEditForm` — ลบทิ้งแล้ว)
   - หน้า `/contracts/history/:id` (`ContractDetail` prop `readOnly`) — เหมือน detail แต่ดูอย่างเดียว (ซ่อนปุ่มแก้/เพิ่ม/ลบ/ลบสัญญา/ตรวจห้องออก) · ปุ่ม "← กลับ" ไป `/contracts/history` · เก็บเป็นประวัติ
 
 ยังไม่มี / หมายเหตุ:
-- ตาราง `rooms` ยังไม่มี — `room_id` เป็น nullable ไม่มี FK
 - ฟอร์มสร้างสัญญาไม่มี transaction — ถ้า checklist/เอกสารพังหลังสร้างสัญญาแล้ว จะได้ข้อมูลไม่ครบ
 - `created_by` ยัง `null` (frontend ยังไม่ส่ง current user)
 - เอกสารในหน้า detail เป็นเอกสารระดับ **ผู้เช่า** (ใช้ร่วมทุกสัญญาของผู้เช่ารายนั้น) — ยังไม่ผูก `contract_id`
 - `expired` ต้องตั้งเอง — ยังไม่มี job อัปเดตสถานะตามวันหมดอายุ
-- "เสร็จสิ้น" ดูจาก **มี checklist `check-out`** ไม่ได้ดู `status` — สัญญาที่ admin ตั้ง `terminated` แต่ยังไม่ได้ตรวจคืนห้อง จะยังอยู่หน้า `/contracts` · พอเข้าประวัติแล้วแก้ไม่ได้ (ต้องผ่าน DB/API)
+- "เสร็จสิ้น" ดูจาก **มี checklist `check-out`** ไม่ได้ดู `status` — สัญญาที่ admin ตั้ง `terminated` ด้วยมือแต่ยังไม่ได้ตรวจคืนห้อง จะยังอยู่หน้า `/contracts` · พอเข้าประวัติแล้วแก้ไม่ได้ (ต้องผ่าน DB/API)
+- บันทึก `check-out` แล้วสัญญาจะเป็น `terminated` เสมอ (ยกเว้นเดิมเป็น `expired` → คงไว้) → หน้าประวัติจะไม่มีสัญญาสถานะ `active` เหลือ
+
+---
+
+## 6.5. Rooms — ห้องพัก (demo)
+
+**Backend:** `routers.py` (`room_router`, prefix `/rooms`), `app/crud/room_crud.py`, `app/models/models.py` (`Room`)
+**Frontend:** ไม่มีหน้าแยก — ใช้ใน `ContractForm.jsx` / `ContractInfoSection.jsx` (dropdown เลือกห้อง)
+
+ทำได้ตอนนี้:
+- ตาราง `rooms` = **reference data คงที่** seed จาก migration `c4f2a9b17d30`:
+  - เลขห้อง = PK · 101–110 / 201–210 / 301–310 / 401–410 (40 ห้อง)
+  - `floor` = หลักร้อยของเลขห้อง · `base_rent` ตามชั้น: 1 → 4500, 2 → 4000, 3 → 3500, 4 → 3000
+- `GET /rooms/` (staff+) — คืน `list[RoomOut]` = `{room_id, floor, base_rent, status, contract_id}`
+  - `status` (`available` / `occupied`) + `contract_id` **คำนวณสดจาก contracts** (ห้องไม่ว่าง = มีสัญญา `status ∈ (draft, active)` ผูกอยู่) — ไม่เก็บใน `rooms`
+  - `?available=true` — เฉพาะห้องว่าง
+- ไม่มี POST/PUT/DELETE (demo — แก้ผ่าน DB/migration เท่านั้น)
+- `contracts.room_id` → FK `rooms.room_id` `ON DELETE SET NULL` · migration ล้างค่า `room_id` เดิมที่ไม่ตรงห้องจริงเป็น NULL
+
+ยังไม่มี / หมายเหตุ:
+- ไม่มีหน้าจัดการห้อง (เพิ่ม/แก้ราคา/ปิดห้อง) — ตั้งใจให้เป็น demo
+- ยังไม่มี job/enum แยกสำหรับห้อง "ปิดปรับปรุง" ฯลฯ — มีแค่ ว่าง/ไม่ว่าง (derived)
 
 ---
 
@@ -157,10 +180,12 @@
   - `photo_urls`: รวมรูปทุกรายการเป็น list เดียว (flat)
   - `cost` = ค่าเสียหายรายรายการ (ใช้ตอน check-out เพื่อคำนวณเงินคืน)
   - `tenant_signature` (ลายเซ็นผู้เช่า, optional)
+  - **`type=check-out` → ยุติสัญญาอัตโนมัติ**: ถ้า `contracts.status` เป็น `draft`/`active` จะถูกตั้งเป็น `terminated` ในทรานแซกชันเดียวกัน (`expired` คงไว้) · staff ทำได้เลย ไม่ต้องรอ admin
 - `GET /contracts/{id}/checklists` (staff+) — รายการ checklist ของสัญญา
 - `PATCH /contracts/{id}/checklists/{cc_id}` (staff+) — แก้ `type` / `items` / `tenant_signature` (ส่งเฉพาะ field ที่แก้) · แก้ `items` แล้ว `photo_urls` คำนวณใหม่ · ไม่พบ/ไม่ใช่ของสัญญานั้น → 404
 - `DELETE /contracts/{id}/checklists/{cc_id}` (staff+) — ลบ checklist หนึ่งใบ · ไม่พบ → 404
 - Frontend: `ChecklistEditor` ใช้ทั้งตอนสร้างสัญญา (check-in), หน้า `/contracts/:id/checkout` (check-out, โชว์ช่องกรอกค่าเสียหาย) และ `ChecklistSection` ในหน้า detail (ดู/เพิ่ม/แก้/ลบ ทุกใบ)
+  - `CheckoutInspection` (หน้า `/contracts/:id/checkout`): กด "บันทึกผลตรวจ & ยุติสัญญา" ครั้งเดียว — บันทึก check-out + ปิดคำขอ (ถ้ามี `?request=`) + สัญญาถูกยุติโดย backend · ไม่มีขั้นตอน "ยืนยันยุติสัญญา" แยกอีกแล้ว (staff/admin เหมือนกัน)
 
 ---
 
@@ -184,7 +209,7 @@
 - สถานะ: `pending` → `accepted` / `rejected` / `completed`
 - Frontend: ผู้เช่ากดแจ้งจาก Dashboard · staff เห็น `RequestPanel` บนหน้า `/contracts` (รับเรื่อง / ต่อสัญญา / ปฏิเสธ) · ยุติสัญญาไปที่หน้าตรวจห้องออก `/contracts/:id/checkout`
 
-หมายเหตุ: การ "ต่อสัญญา" จริง ๆ (ขยาย `end_date`) และ "ยุติ" (ตั้ง `terminated`) ยังเป็นการกระทำแยกบน `/contracts/{id}` — request เป็นตัวติดตามคำขอ ไม่ได้แก้สัญญาให้อัตโนมัติ
+หมายเหตุ: "ต่อสัญญา" จริง ๆ (ขยาย `end_date`) ยังเป็นการกระทำแยกบน `/contracts/{id}` — request เป็นตัวติดตามคำขอ · ส่วน "ยุติ" ตอนนี้เกิดอัตโนมัติเมื่อบันทึก checklist `check-out` (ดูโมดูล 7)
 
 ---
 
@@ -272,7 +297,7 @@
 - `app/models/models.py` — ORM models ทั้งหมด (source of truth ของ schema) + enums + `TimestampMixin` + `_enum_col`
 - `app/schemas/schemas.py` — Pydantic schemas (request/response)
 - `app/crud/*` — logic เข้าถึง DB แยกตาม entity
-- `alembic/versions/` — migration: init → unique rate → contract_requests → `b33c320591bb` (`users.avatar_url`)
+- `alembic/versions/` — migration: init → unique rate → contract_requests → `b33c320591bb` (`users.avatar_url`) → `c4f2a9b17d30` (`rooms` + `contracts.room_id` FK)
 - `create_admin.py` — seed admin คนแรก
 
 ### Frontend `src/lib/` + `src/auth/` + `src/layout/` + `src/components/`
@@ -296,7 +321,7 @@
 
 ## สรุปสิ่งที่ยังไม่มี (ข้ามโมดูล)
 
-- **Rooms** — ยังไม่มีตาราง/โมดูลห้องพัก (`contracts.room_id` ลอยอยู่)
+- **Rooms** — มีตาราง `rooms` แล้ว (demo, seed คงที่) แต่ยังไม่มีหน้าจัดการห้อง / สถานะ "ปิดปรับปรุง"
 - **บิล / ใบแจ้งหนี้ / มิเตอร์น้ำ-ไฟ** — มีแค่ "อัตรา" ยังไม่มีการออกบิล
 - **การเข้ารหัสบัตรประชาชนจริง** — `national_id_encrypted` ยัง plaintext
 - **`created_by` / `uploaded_by`** — ยังไม่ถูกบันทึกจาก current user

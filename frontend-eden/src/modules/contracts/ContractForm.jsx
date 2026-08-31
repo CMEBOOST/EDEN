@@ -55,6 +55,7 @@ function ContractForm() {
   const navigate = useNavigate();
 
   const [tenants, setTenants] = useState([]);
+  const [rooms, setRooms] = useState([]); // ห้องว่าง (สำหรับ dropdown)
   const [contract, setContract] = useState({
     tenant_id: "",
     room_id: "",
@@ -78,7 +79,21 @@ function ContractForm() {
     apiGet("/tenants/")
       .then(setTenants)
       .catch((e) => setError(e.message));
+    apiGet("/rooms/?available=true")
+      .then(setRooms)
+      .catch(() => setRooms([]));
   }, []);
+
+  // เลือกห้อง -> เติมค่าเช่าตั้งต้นของห้องนั้นให้ (แก้ต่อได้)
+  const pickRoom = (e) => {
+    const roomId = e.target.value;
+    const room = rooms.find((r) => String(r.room_id) === roomId);
+    setContract((c) => ({
+      ...c,
+      room_id: roomId,
+      rent: room ? String(room.base_rent) : c.rent,
+    }));
+  };
 
   // ดึงอัตราที่มีผล ณ วันเริ่มสัญญา (ไม่ได้เก็บลง contract — ใช้ประกอบการพิจารณา)
   useEffect(() => {
@@ -178,13 +193,19 @@ function ContractForm() {
               ))}
             </select>
           </Field>
-          <Field label="เลขห้อง">
-            <input
+          <Field label="ห้อง">
+            <select
               value={contract.room_id}
-              onChange={set("room_id")}
+              onChange={pickRoom}
               className={inputCls}
-              inputMode="numeric"
-            />
+            >
+              <option value="">— ไม่ระบุห้อง —</option>
+              {rooms.map((r) => (
+                <option key={r.room_id} value={r.room_id}>
+                  {r.room_id} · ชั้น {r.floor} · {Number(r.base_rent).toLocaleString()} ฿
+                </option>
+              ))}
+            </select>
           </Field>
           <Field label="วันเริ่มสัญญา" required>
             <input

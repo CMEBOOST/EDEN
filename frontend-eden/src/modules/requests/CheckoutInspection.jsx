@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { apiGet, apiPost, apiPatch, apiPut, fileUrl } from "../../lib/api";
-import { useAuth } from "../../auth/AuthContext";
+import { apiGet, apiPost, apiPatch, fileUrl } from "../../lib/api";
 import ChecklistEditor from "../contracts/ChecklistEditor";
-import ConfirmDialog from "../../components/ConfirmDialog";
 
 const fmtBaht = (n) =>
   Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -20,8 +18,6 @@ function CheckoutInspection() {
   const [params] = useSearchParams();
   const requestId = params.get("request");
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
 
   const [contract, setContract] = useState(null);
   const [checkin, setCheckin] = useState(null);
@@ -31,7 +27,6 @@ function CheckoutInspection() {
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
-  const [confirmTerminate, setConfirmTerminate] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -100,18 +95,6 @@ function CheckoutInspection() {
       setError(e.message);
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  async function handleTerminate() {
-    setSubmitting(true);
-    try {
-      await apiPut(`/contracts/${contractId}`, { status: "terminated" });
-      navigate("/contracts");
-    } catch (e) {
-      setError(e.message);
-      setSubmitting(false);
-      setConfirmTerminate(false);
     }
   }
 
@@ -221,58 +204,27 @@ function CheckoutInspection() {
             disabled={submitting}
             className="px-4 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
           >
-            {submitting ? "กำลังบันทึก..." : "บันทึกผลตรวจ & ปิดคำขอ"}
+            {submitting ? "กำลังบันทึก..." : "บันทึกผลตรวจ & ยุติสัญญา"}
           </button>
         </div>
       ) : (
         <div className="border border-green-200 bg-green-50 rounded-xl p-4 flex flex-col gap-3">
           <span className="text-green-800 text-sm font-medium">
-            ✓ บันทึกผลตรวจสภาพห้องออกแล้ว
+            ✓ บันทึกผลตรวจสภาพห้องออก & ยุติสัญญาแล้ว
           </span>
-          {isAdmin ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setConfirmTerminate(true)}
-                className="px-4 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700"
-              >
-                ยุติสัญญา (ตั้งสถานะ terminated)
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/contracts")}
-                className="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
-              >
-                ไว้ทีหลัง
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-gray-500">
-                รอผู้ดูแลระบบยืนยันการยุติสัญญา
-              </span>
-              <button
-                type="button"
-                onClick={() => navigate("/contracts")}
-                className="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
-              >
-                กลับหน้าสัญญา
-              </button>
-            </div>
-          )}
+          <p className="text-xs text-gray-500">
+            สัญญา #{contractId} ถูกตั้งสถานะเป็น "ยกเลิก" และย้ายไปหน้าประวัติสัญญาเช่าแล้ว
+          </p>
+          <div>
+            <button
+              type="button"
+              onClick={() => navigate("/contracts")}
+              className="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
+            >
+              กลับหน้าสัญญา
+            </button>
+          </div>
         </div>
-      )}
-
-      {confirmTerminate && (
-        <ConfirmDialog
-          title="ยุติสัญญา"
-          message={`ตั้งสถานะสัญญา #${contractId} เป็น "ยุติแล้ว" ใช่หรือไม่?`}
-          confirmText="ยุติสัญญา"
-          danger
-          busy={submitting}
-          onConfirm={handleTerminate}
-          onClose={() => setConfirmTerminate(false)}
-        />
       )}
     </div>
   );

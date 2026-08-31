@@ -110,6 +110,14 @@ class DocumentCreate(BaseModel):
     uploaded_by: int | None = None
 
 
+class RoomOut(BaseModel):
+    room_id: int          # = เลขห้อง
+    floor: int
+    base_rent: float
+    status: str           # "available" | "occupied"
+    contract_id: int | None = None   # สัญญาที่ผูกอยู่ (ถ้า occupied)
+
+
 class Contracts(BaseModel):
     tenant_id: int
     room_id: int | None = None

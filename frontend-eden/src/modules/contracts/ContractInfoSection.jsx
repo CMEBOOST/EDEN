@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { apiPut, apiUpload, fileUrl } from "../../lib/api";
+import { useEffect, useState } from "react";
+import { apiGet, apiPut, apiUpload, fileUrl } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
 import FileDropField from "../../components/FileDropField";
@@ -43,8 +43,15 @@ function ContractInfoSection({ contract, onSaved, readOnly = false }) {
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [newFile, setNewFile] = useState(null);
+  const [rooms, setRooms] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (editing && rooms.length === 0) {
+      apiGet("/rooms/").then(setRooms).catch(() => setRooms([]));
+    }
+  }, [editing, rooms.length]);
 
   function startEdit() {
     setForm({
@@ -118,7 +125,7 @@ function ContractInfoSection({ contract, onSaved, readOnly = false }) {
       {!editing ? (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            <Row label="เลขห้อง">{contract.room_id ?? "-"}</Row>
+            <Row label="ห้อง">{contract.room_id ?? "-"}</Row>
             <Row label="สถานะ">{statusLabel[contract.status] ?? contract.status}</Row>
             <Row label="ค่าเช่า/เดือน">{fmtBaht(contract.rent)} ฿</Row>
             <Row label="วันเริ่มสัญญา">{formatDate(contract.start_date)}</Row>
@@ -146,13 +153,26 @@ function ContractInfoSection({ contract, onSaved, readOnly = false }) {
       ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="เลขห้อง">
-              <input
+            <Field label="ห้อง">
+              <select
                 value={form.room_id}
                 onChange={set("room_id")}
                 className={inputCls}
-                inputMode="numeric"
-              />
+              >
+                <option value="">— ไม่ระบุห้อง —</option>
+                {rooms
+                  .filter(
+                    (r) =>
+                      r.status === "available" ||
+                      String(r.room_id) === String(contract.room_id)
+                  )
+                  .map((r) => (
+                    <option key={r.room_id} value={r.room_id}>
+                      {r.room_id} · ชั้น {r.floor} ·{" "}
+                      {Number(r.base_rent).toLocaleString()} ฿
+                    </option>
+                  ))}
+              </select>
             </Field>
             <Field label="สถานะ">
               <select
