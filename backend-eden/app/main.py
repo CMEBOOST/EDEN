@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .core.audit import AuditMiddleware
+from .core.errors import ErrorHandlerMiddleware
 from .core.storage import UPLOAD_DIR
 from .routers import routers
 
@@ -15,7 +16,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# เปิด CORS ให้ frontend (Vite dev server) ดึง API ได้
+# ลำดับ middleware สำคัญ — Starlette ใส่ตัวที่ add ทีหลังไว้ "ชั้นนอกกว่า"
+# ชั้นนอก → ชั้นใน:  CORS  →  ErrorHandler  →  Audit  →  router
+#   - Audit: บันทึก log (add ก่อน = ชั้นในสุด)
+#   - ErrorHandler: จับ exception ที่ไม่ได้ handle → ตอบ JSON 500 (แทน error ดิบของ Starlette)
+#   - CORS: add ทีหลังสุด = ชั้นนอกสุด → response ทุกตัว (รวม 500 จาก ErrorHandler)
+#     วิ่งผ่าน CORS ขาออก จึงได้ header Access-Control-* ครบ ไม่งั้น browser เห็น "Failed to fetch"
+app.add_middleware(AuditMiddleware)
+app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -23,9 +31,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# บันทึก audit log ทุก request ที่เปลี่ยนข้อมูลและสำเร็จ
-app.add_middleware(AuditMiddleware)
 
 # เสิร์ฟไฟล์อัปโหลด (รูป checklist / เอกสาร) ที่ /uploads
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")

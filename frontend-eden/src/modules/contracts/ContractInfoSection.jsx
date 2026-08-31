@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { apiPut, apiUpload, fileUrl } from "../../lib/api";
+import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
 import FileDropField from "../../components/FileDropField";
 
@@ -12,6 +13,9 @@ const STATUS_OPTIONS = [
   ["expired", "หมดอายุ"],
   ["terminated", "ยกเลิก"],
 ];
+const statusLabel = Object.fromEntries(STATUS_OPTIONS);
+
+const fmtBaht = (n) => Number(n ?? 0).toLocaleString();
 
 function Field({ label, children }) {
   return (
@@ -22,27 +26,39 @@ function Field({ label, children }) {
   );
 }
 
-function ContractEditForm({ contract, onClose, onSaved }) {
+function Row({ label, children }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs text-gray-400">{label}</span>
+      <span className="text-sm text-gray-800">{children}</span>
+    </div>
+  );
+}
+
+// section ข้อมูลสัญญา — โหมดดู + สลับเป็นโหมดแก้ (PUT /contracts/{id})
+function ContractInfoSection({ contract, onSaved }) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const [form, setForm] = useState({
-    room_id: contract.room_id ?? "",
-    start_date: contract.start_date ?? "",
-    end_date: contract.end_date ?? "",
-    rent: String(contract.rent ?? ""),
-    security_deposit: String(contract.security_deposit ?? ""),
-    status: contract.status ?? "draft",
-    special_conditions: contract.special_conditions ?? "",
-  });
-  const [newFile, setNewFile] = useState(null); // ไฟล์สัญญาใหม่ (ถ้าเปลี่ยน)
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState(null);
+  const [newFile, setNewFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && onClose?.();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  function startEdit() {
+    setForm({
+      room_id: contract.room_id ?? "",
+      start_date: contract.start_date ?? "",
+      end_date: contract.end_date ?? "",
+      rent: String(contract.rent ?? ""),
+      security_deposit: String(contract.security_deposit ?? ""),
+      status: contract.status ?? "draft",
+      special_conditions: contract.special_conditions ?? "",
+    });
+    setNewFile(null);
+    setError(null);
+    setEditing(true);
+  }
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
@@ -69,7 +85,7 @@ function ContractEditForm({ contract, onClose, onSaved }) {
         contract_file_url: contractFileUrl,
       });
       onSaved?.(updated);
-      onClose?.();
+      setEditing(false);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -78,33 +94,55 @@ function ContractEditForm({ contract, onClose, onSaved }) {
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex justify-between items-center">
-          <h3 className="text-xl font-semibold">
-            แก้ไขสัญญา #{contract.contract_id}
-          </h3>
+    <section className="border border-gray-200 rounded-xl p-5 flex flex-col gap-4">
+      <div className="flex items-center justify-between">
+        <h3 className="font-semibold text-lg">ข้อมูลสัญญา</h3>
+        {!editing && (
           <button
             type="button"
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl leading-none"
+            onClick={startEdit}
+            className="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50"
           >
-            &times;
+            แก้ไข
           </button>
-        </div>
-
-        {error && (
-          <div className="bg-red-50 text-red-700 text-sm rounded px-3 py-2">
-            {error}
-          </div>
         )}
+      </div>
 
+      {error && (
+        <div className="bg-red-50 text-red-700 text-sm rounded px-3 py-2">
+          {error}
+        </div>
+      )}
+
+      {!editing ? (
+        <>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <Row label="เลขห้อง">{contract.room_id ?? "-"}</Row>
+            <Row label="สถานะ">{statusLabel[contract.status] ?? contract.status}</Row>
+            <Row label="ค่าเช่า/เดือน">{fmtBaht(contract.rent)} ฿</Row>
+            <Row label="วันเริ่มสัญญา">{formatDate(contract.start_date)}</Row>
+            <Row label="วันสิ้นสุดสัญญา">{formatDate(contract.end_date)}</Row>
+            <Row label="เงินประกัน">{fmtBaht(contract.security_deposit)} ฿</Row>
+          </div>
+          <Row label="เงื่อนไขพิเศษ">
+            {contract.special_conditions || "-"}
+          </Row>
+          <Row label="ไฟล์สัญญา">
+            {contract.contract_file_url ? (
+              <a
+                href={fileUrl(contract.contract_file_url)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                📄 เปิดดูไฟล์สัญญา
+              </a>
+            ) : (
+              "- ยังไม่มีไฟล์"
+            )}
+          </Row>
+        </>
+      ) : (
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
             <Field label="เลขห้อง">
@@ -192,10 +230,10 @@ function ContractEditForm({ contract, onClose, onSaved }) {
             <FileDropField value={newFile} onChange={setNewFile} />
           </Field>
 
-          <div className="flex justify-end gap-2 mt-2">
+          <div className="flex justify-end gap-2 mt-1">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => setEditing(false)}
               className="px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
             >
               ยกเลิก
@@ -209,9 +247,9 @@ function ContractEditForm({ contract, onClose, onSaved }) {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      )}
+    </section>
   );
 }
 
-export default ContractEditForm;
+export default ContractInfoSection;

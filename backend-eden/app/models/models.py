@@ -176,8 +176,13 @@ class Contracts(TimestampMixin, Base):
     created_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
     created_by_user: Mapped["Users | None"] = relationship(back_populates="contracts_created")
 
-    contract_checklists: Mapped[list["ContractChecklist"]] = relationship(back_populates="contract")
-    contract_requests: Mapped[list["ContractRequest"]] = relationship(back_populates="contract")
+    # ลบสัญญา = ลบ checklist / คำแจ้งความจำนงของสัญญานั้นตามไปด้วย (hard delete, admin เท่านั้น)
+    contract_checklists: Mapped[list["ContractChecklist"]] = relationship(
+        back_populates="contract", cascade="all, delete-orphan"
+    )
+    contract_requests: Mapped[list["ContractRequest"]] = relationship(
+        back_populates="contract", cascade="all, delete-orphan"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -150,6 +150,13 @@ class ChecklistCreate(BaseModel):
     created_by: int | None = None
 
 
+class ChecklistUpdate(BaseModel):
+    """สำหรับ PATCH — ส่งมาเฉพาะ field ที่อยากแก้"""
+    type: ChecklistType | None = None
+    items: list[ChecklistItem] | None = None
+    tenant_signature: str | None = None
+
+
 class ContractRequestCreate(BaseModel):
     contract_id: int
     request_type: RequestType

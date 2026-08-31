@@ -1,0 +1,156 @@
+import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { apiGet, apiDelete } from "../../lib/api";
+import { useAuth } from "../../auth/AuthContext";
+import ConfirmDialog from "../../components/ConfirmDialog";
+import ContractInfoSection from "./ContractInfoSection";
+import ChecklistSection from "./ChecklistSection";
+import ContractDocuments from "./ContractDocuments";
+
+const statusStyle = {
+  draft: "bg-gray-100 text-gray-500",
+  active: "bg-green-100 text-green-700",
+  expired: "bg-amber-100 text-amber-700",
+  terminated: "bg-red-100 text-red-700",
+};
+const statusLabel = {
+  draft: "ร่าง",
+  active: "ใช้งาน",
+  expired: "หมดอายุ",
+  terminated: "ยกเลิก",
+};
+
+// หน้ารายละเอียดสัญญา — ข้อมูลสัญญา + บันทึกสภาพห้อง + เอกสารแนบ
+function ContractDetail() {
+  const { contractId } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+
+  const [contract, setContract] = useState(null);
+  const [tenant, setTenant] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const ctr = await apiGet(`/contracts/${contractId}`);
+        if (cancelled) return;
+        setContract(ctr);
+        try {
+          const t = await apiGet(`/tenants/${ctr.tenant_id}`);
+          if (!cancelled) setTenant(t);
+        } catch {
+          /* ไม่ critical — ยังแสดงหน้าได้ */
+        }
+      } catch (e) {
+        if (!cancelled) setError(e.message);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [contractId]);
+
+  async function handleDelete() {
+    setDeleteBusy(true);
+    try {
+      await apiDelete(`/contracts/${contractId}`);
+      navigate("/contracts");
+    } catch (e) {
+      alert(`ลบไม่สำเร็จ: ${e.message}`);
+      setDeleteBusy(false);
+      setConfirmDelete(false);
+    }
+  }
+
+  if (loading)
+    return <div className="p-6 text-gray-400 font-sans">กำลังโหลด...</div>;
+  if (error || !contract)
+    return (
+      <div className="p-6 font-sans flex flex-col gap-3">
+        <div className="text-red-600">{error ?? "ไม่พบสัญญา"}</div>
+        <button
+          type="button"
+          onClick={() => navigate("/contracts")}
+          className="self-start text-gray-500 hover:text-gray-800"
+        >
+          ← กลับหน้าสัญญา
+        </button>
+      </div>
+    );
+
+  return (
+    <div className="flex flex-col gap-5 font-sans max-w-3xl">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate("/contracts")}
+          className="text-gray-500 hover:text-gray-800"
+        >
+          ← กลับ
+        </button>
+        <h2 className="text-2xl font-semibold">สัญญา #{contract.contract_id}</h2>
+        <span
+          className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
+            statusStyle[contract.status] ?? "bg-gray-100 text-gray-500"
+          }`}
+        >
+          {statusLabel[contract.status] ?? contract.status}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm text-gray-600">
+          ผู้เช่า: {tenant?.full_name ?? `#${contract.tenant_id}`}
+          {" · "}ห้อง {contract.room_id ?? "-"}
+        </div>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => navigate(`/contracts/${contractId}/checkout`)}
+            className="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50"
+          >
+            ตรวจสภาพห้องออก
+          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="px-3 py-1.5 text-sm rounded text-red-600 border border-red-200 hover:bg-red-50"
+            >
+              ลบสัญญา
+            </button>
+          )}
+        </div>
+      </div>
+
+      <ContractInfoSection contract={contract} onSaved={setContract} />
+      <ChecklistSection contractId={contractId} />
+      <ContractDocuments tenantId={contract.tenant_id} />
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="ลบสัญญา"
+          message={`ต้องการลบสัญญา #${contractId} ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`}
+          confirmText="ลบ"
+          danger
+          busy={deleteBusy}
+          onConfirm={handleDelete}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+export default ContractDetail;

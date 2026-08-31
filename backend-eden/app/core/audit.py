@@ -33,6 +33,10 @@ def describe(method: str, path: str) -> str:
     if len(parts) >= 3 and parts[0] == "tenants" and parts[2] == "documents":
         return f"เพิ่มเอกสารของผู้เช่า #{parts[1]}"
     if len(parts) >= 3 and parts[0] == "contracts" and parts[2] == "checklists":
+        if method == "PATCH" and len(parts) >= 4:
+            return f"แก้ไขผลตรวจสภาพห้อง สัญญา #{parts[1]}"
+        if method == "DELETE" and len(parts) >= 4:
+            return f"ลบผลตรวจสภาพห้อง สัญญา #{parts[1]}"
         return f"บันทึกสภาพห้อง สัญญา #{parts[1]}"
     if parts[0] == "profile":
         if len(parts) >= 2 and parts[1] == "password":

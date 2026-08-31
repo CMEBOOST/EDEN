@@ -4,7 +4,6 @@ import { apiGet, apiDelete } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
 import ConfirmDialog from "../../components/ConfirmDialog";
-import ContractEditForm from "./ContractEditForm";
 import RequestPanel from "../requests/RequestPanel";
 
 // status ตรงกับ contract_status_enum ใน backend
@@ -31,16 +30,10 @@ function Contracts() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [tick, setTick] = useState(0);
   const reload = () => setTick((t) => t + 1);
-
-  const upsertContract = (saved) =>
-    setContracts((prev) =>
-      prev.map((c) => (c.contract_id === saved.contract_id ? saved : c))
-    );
 
   async function handleDelete() {
     setDeleteBusy(true);
@@ -183,7 +176,8 @@ function Contracts() {
               filtered.map((c) => (
                 <tr
                   key={c.contract_id}
-                  className="bg-white hover:bg-gray-50 transition-colors"
+                  onClick={() => navigate(`/contracts/${c.contract_id}`)}
+                  className="bg-white hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {c.room_id ?? "-"}
@@ -212,14 +206,20 @@ function Contracts() {
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-2">
                       <button
-                        onClick={() => setEditing(c)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/contracts/${c.contract_id}`);
+                        }}
                         className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
                       >
-                        แก้ไข
+                        รายละเอียด
                       </button>
                       {isAdmin && (
                         <button
-                          onClick={() => setDeleting(c)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleting(c);
+                          }}
                           className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
                         >
                           ลบ
@@ -232,14 +232,6 @@ function Contracts() {
           </tbody>
         </table>
       </div>
-
-      {editing && (
-        <ContractEditForm
-          contract={editing}
-          onClose={() => setEditing(null)}
-          onSaved={upsertContract}
-        />
-      )}
 
       {deleting && (
         <ConfirmDialog

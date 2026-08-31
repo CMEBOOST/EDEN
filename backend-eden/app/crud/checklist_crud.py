@@ -28,3 +28,38 @@ def get_checklists(db: Session, contract_id: int):
         .filter(models.ContractChecklist.contract_id == contract_id)
         .all()
     )
+
+
+def get_checklist(db: Session, cc_id: int):
+    return (
+        db.query(models.ContractChecklist)
+        .filter(models.ContractChecklist.cc_id == cc_id)
+        .first()
+    )
+
+
+def update_checklist(db: Session, cc_id: int, data: schemas.ChecklistUpdate):
+    checklist = get_checklist(db, cc_id)
+    if checklist is None:
+        return None
+
+    if data.type is not None:
+        checklist.type = data.type
+    if data.tenant_signature is not None:
+        checklist.tenant_signature = data.tenant_signature
+    if data.items is not None:
+        checklist.checklist_items = [item.model_dump() for item in data.items]
+        checklist.photo_urls = [url for item in data.items for url in item.photos]
+
+    db.commit()
+    db.refresh(checklist)
+    return checklist
+
+
+def delete_checklist(db: Session, cc_id: int):
+    checklist = get_checklist(db, cc_id)
+    if checklist is None:
+        return None
+    db.delete(checklist)
+    db.commit()
+    return checklist

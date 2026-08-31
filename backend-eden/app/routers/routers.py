@@ -324,6 +324,30 @@ def list_checklists_route(contract_id: int, db: Session = Depends(get_db)):
     return checklist_crud.get_checklists(db=db, contract_id=contract_id)
 
 
+@contract_router.patch("/{contract_id}/checklists/{cc_id}", dependencies=_staff)
+def update_checklist_route(
+    contract_id: int,
+    cc_id: int,
+    data: schemas.ChecklistUpdate,
+    db: Session = Depends(get_db),
+):
+    existing = checklist_crud.get_checklist(db=db, cc_id=cc_id)
+    if existing is None or existing.contract_id != contract_id:
+        raise HTTPException(status_code=404, detail="ไม่พบบันทึกสภาพห้อง")
+    return checklist_crud.update_checklist(db=db, cc_id=cc_id, data=data)
+
+
+@contract_router.delete("/{contract_id}/checklists/{cc_id}", dependencies=_staff)
+def delete_checklist_route(
+    contract_id: int, cc_id: int, db: Session = Depends(get_db)
+):
+    existing = checklist_crud.get_checklist(db=db, cc_id=cc_id)
+    if existing is None or existing.contract_id != contract_id:
+        raise HTTPException(status_code=404, detail="ไม่พบบันทึกสภาพห้อง")
+    checklist_crud.delete_checklist(db=db, cc_id=cc_id)
+    return {"delete": "ok"}
+
+
 # ---------------------------------------------------------------------------
 # Rate configs (อัตราค่าน้ำ / ค่าไฟ)
 # ---------------------------------------------------------------------------
