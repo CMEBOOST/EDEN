@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet, apiDelete } from "../../lib/api";
+import { apiGet } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
-import { useAuth } from "../../auth/AuthContext";
-import ConfirmDialog from "../../components/ConfirmDialog";
-import RequestPanel from "../requests/RequestPanel";
 
 // status ตรงกับ contract_status_enum ใน backend
 const statusStyle = {
@@ -13,7 +10,6 @@ const statusStyle = {
   expired: "bg-amber-100 text-amber-700",
   terminated: "bg-red-100 text-red-700",
 };
-
 const statusLabel = {
   draft: "ร่าง",
   active: "ใช้งาน",
@@ -21,48 +17,25 @@ const statusLabel = {
   terminated: "ยกเลิก",
 };
 
-function Contracts() {
+// หน้าประวัติสัญญาเช่า — เฉพาะสัญญาที่ทำ "ตรวจคืนห้อง (check-out)" แล้ว (เสร็จสิ้นกระบวนการ)
+function ContractHistory() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
   const [contracts, setContracts] = useState([]);
   const [tenantsById, setTenantsById] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [deleting, setDeleting] = useState(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  const [tick, setTick] = useState(0);
-  const reload = () => setTick((t) => t + 1);
-
-  async function handleDelete() {
-    setDeleteBusy(true);
-    try {
-      await apiDelete(`/contracts/${deleting.contract_id}`);
-      setContracts((prev) =>
-        prev.filter((c) => c.contract_id !== deleting.contract_id)
-      );
-      setDeleting(null);
-    } catch (e) {
-      alert(`ลบไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setDeleteBusy(false);
-    }
-  }
 
   useEffect(() => {
     let cancelled = false;
-
     async function load() {
-      setLoading(true);
-      setError(null);
       try {
-        const [contractList, tenantList] = await Promise.all([
-          apiGet("/contracts/?finished=false"),
+        const [list, tenantList] = await Promise.all([
+          apiGet("/contracts/?finished=true"),
           apiGet("/tenants/"),
         ]);
         if (cancelled) return;
-        setContracts(contractList);
+        setContracts(list);
         setTenantsById(
           Object.fromEntries(tenantList.map((t) => [t.tenant_id, t]))
         );
@@ -72,12 +45,11 @@ function Contracts() {
         if (!cancelled) setLoading(false);
       }
     }
-
     load();
     return () => {
       cancelled = true;
     };
-  }, [tick]);
+  }, []);
 
   const tenantName = (id) => tenantsById[id]?.full_name ?? `#${id}`;
 
@@ -96,28 +68,20 @@ function Contracts() {
     <div className="p-2 flex flex-col gap-2 font-sans">
       <div className="flex justify-between">
         <div>
-          <h2 className="text-3xl">สัญญาเช่า</h2>
+          <h2 className="text-3xl">ประวัติสัญญาเช่า</h2>
           <p className="text-gray-500">
-            ห้องเช่าทั้งหมด {!loading && `(${contracts.length})`}
+            สัญญาที่ตรวจคืนห้องแล้ว {!loading && `(${contracts.length})`}
           </p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div>
           <button
-            onClick={() => navigate("/contracts/history")}
-            className="px-2.5 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
+            onClick={() => navigate("/contracts")}
+            className="px-3 py-2 rounded border border-gray-300 hover:bg-gray-50"
           >
-            ประวัติสัญญาเช่า
-          </button>
-          <button
-            onClick={() => navigate("/contracts/new")}
-            className="px-2.5 py-2 text-sm bg-blue-500 rounded text-gray-100 hover:bg-blue-600"
-          >
-            เพิ่มสัญญา
+            ← กลับหน้าสัญญาเช่า
           </button>
         </div>
       </div>
-
-      <RequestPanel onActioned={reload} />
 
       <div className="bg-gray-50 flex p-2 justify-start items-center rounded">
         <input
@@ -130,15 +94,6 @@ function Contracts() {
         />
       </div>
 
-      <div>
-        <ul className="flex gap-3">
-          <li className="p-2 bg-gray-50 rounded hover:bg-gray-100">ทั้งหมด</li>
-          <li className="p-2 bg-gray-50 rounded hover:bg-gray-100">ค่าเช่า</li>
-          <li className="p-2 bg-gray-50 rounded hover:bg-gray-100">สถานะ</li>
-        </ul>
-      </div>
-
-      {/* ตาราง */}
       <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-gray-100 text-gray-600 uppercase text-xs tracking-wide">
@@ -172,7 +127,7 @@ function Contracts() {
             {!loading && !error && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
-                  ไม่มีข้อมูลสัญญา
+                  ยังไม่มีสัญญาที่เสร็จสิ้น
                 </td>
               </tr>
             )}
@@ -182,7 +137,7 @@ function Contracts() {
               filtered.map((c) => (
                 <tr
                   key={c.contract_id}
-                  onClick={() => navigate(`/contracts/${c.contract_id}`)}
+                  onClick={() => navigate(`/contracts/history/${c.contract_id}`)}
                   className="bg-white hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <td className="px-4 py-3 font-medium text-gray-900">
@@ -210,50 +165,23 @@ function Contracts() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/contracts/${c.contract_id}`);
-                        }}
-                        className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
-                      >
-                        รายละเอียด
-                      </button>
-                      {isAdmin && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleting(c);
-                          }}
-                          className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
-                        >
-                          ลบ
-                        </button>
-                      )}
-                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/contracts/history/${c.contract_id}`);
+                      }}
+                      className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
+                    >
+                      ดูประวัติ
+                    </button>
                   </td>
                 </tr>
               ))}
           </tbody>
         </table>
       </div>
-
-      {deleting && (
-        <ConfirmDialog
-          title="ลบสัญญา"
-          message={`ต้องการลบสัญญา #${deleting.contract_id} (${tenantName(
-            deleting.tenant_id
-          )}) ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`}
-          confirmText="ลบ"
-          danger
-          busy={deleteBusy}
-          onConfirm={handleDelete}
-          onClose={() => setDeleting(null)}
-        />
-      )}
     </div>
   );
 }
 
-export default Contracts;
+export default ContractHistory;

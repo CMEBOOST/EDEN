@@ -21,11 +21,13 @@ const statusLabel = {
 };
 
 // หน้ารายละเอียดสัญญา — ข้อมูลสัญญา + บันทึกสภาพห้อง + เอกสารแนบ
-function ContractDetail() {
+// readOnly = เปิดจากหน้าประวัติสัญญาเช่า — ดูอย่างเดียว ไม่มีปุ่มแก้/เพิ่ม/ลบ
+function ContractDetail({ readOnly = false }) {
   const { contractId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const backTo = readOnly ? "/contracts/history" : "/contracts";
 
   const [contract, setContract] = useState(null);
   const [tenant, setTenant] = useState(null);
@@ -81,7 +83,7 @@ function ContractDetail() {
         <div className="text-red-600">{error ?? "ไม่พบสัญญา"}</div>
         <button
           type="button"
-          onClick={() => navigate("/contracts")}
+          onClick={() => navigate(backTo)}
           className="self-start text-gray-500 hover:text-gray-800"
         >
           ← กลับหน้าสัญญา
@@ -94,12 +96,17 @@ function ContractDetail() {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => navigate("/contracts")}
+          onClick={() => navigate(backTo)}
           className="text-gray-500 hover:text-gray-800"
         >
           ← กลับ
         </button>
         <h2 className="text-2xl font-semibold">สัญญา #{contract.contract_id}</h2>
+        {readOnly && (
+          <span className="inline-block px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+            ประวัติ · อ่านอย่างเดียว
+          </span>
+        )}
         <span
           className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
             statusStyle[contract.status] ?? "bg-gray-100 text-gray-500"
@@ -114,29 +121,35 @@ function ContractDetail() {
           ผู้เช่า: {tenant?.full_name ?? `#${contract.tenant_id}`}
           {" · "}ห้อง {contract.room_id ?? "-"}
         </div>
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => navigate(`/contracts/${contractId}/checkout`)}
-            className="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50"
-          >
-            ตรวจสภาพห้องออก
-          </button>
-          {isAdmin && (
+        {!readOnly && (
+          <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setConfirmDelete(true)}
-              className="px-3 py-1.5 text-sm rounded text-red-600 border border-red-200 hover:bg-red-50"
+              onClick={() => navigate(`/contracts/${contractId}/checkout`)}
+              className="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50"
             >
-              ลบสัญญา
+              ตรวจสภาพห้องออก
             </button>
-          )}
-        </div>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(true)}
+                className="px-3 py-1.5 text-sm rounded text-red-600 border border-red-200 hover:bg-red-50"
+              >
+                ลบสัญญา
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      <ContractInfoSection contract={contract} onSaved={setContract} />
-      <ChecklistSection contractId={contractId} />
-      <ContractDocuments tenantId={contract.tenant_id} />
+      <ContractInfoSection
+        contract={contract}
+        onSaved={setContract}
+        readOnly={readOnly}
+      />
+      <ChecklistSection contractId={contractId} readOnly={readOnly} />
+      <ContractDocuments tenantId={contract.tenant_id} readOnly={readOnly} />
 
       {confirmDelete && (
         <ConfirmDialog

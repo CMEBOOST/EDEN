@@ -30,7 +30,8 @@ const statusItemStyle = {
 };
 
 // section บันทึกสภาพห้อง (checklists) ของสัญญา — ดู / แก้ / ลบ / เพิ่ม
-function ChecklistSection({ contractId }) {
+// readOnly = ดูอย่างเดียว (หน้าประวัติ) — ซ่อนปุ่มเพิ่ม/แก้/ลบ
+function ChecklistSection({ contractId, readOnly = false }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -124,7 +125,7 @@ function ChecklistSection({ contractId }) {
     <section className="border border-gray-200 rounded-xl p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-lg">บันทึกสภาพห้อง</h3>
-        {!editing && (
+        {!editing && !readOnly && (
           <div className="flex gap-2">
             <button
               type="button"
@@ -213,22 +214,24 @@ function ChecklistSection({ contractId }) {
                   · {formatDate(row.created_at)}
                 </span>
               </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => startEditExisting(row)}
-                  className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
-                >
-                  แก้ไข
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeleting(row)}
-                  className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
-                >
-                  ลบ
-                </button>
-              </div>
+              {!readOnly && (
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => startEditExisting(row)}
+                    className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
+                  >
+                    แก้ไข
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleting(row)}
+                    className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
+                  >
+                    ลบ
+                  </button>
+                </div>
+              )}
             </div>
 
             <ul className="text-sm flex flex-col gap-1">

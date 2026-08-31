@@ -1,3 +1,4 @@
+from sqlalchemy import and_, exists
 from sqlalchemy.orm import Session
 
 from ..models import models
@@ -28,10 +29,23 @@ def get_contracts(
     skip: int = 0,
     limit: int = 10,
     tenant_id: int | None = None,
+    finished: bool | None = None,
 ):
     query = db.query(models.Contracts)
     if tenant_id is not None:
         query = query.filter(models.Contracts.tenant_id == tenant_id)
+
+    if finished is not None:
+        # "เสร็จสิ้น" = มี checklist ตรวจคืนห้อง (check-out) อย่างน้อย 1 ใบ
+        has_checkout = exists().where(
+            and_(
+                models.ContractChecklist.contract_id
+                == models.Contracts.contract_id,
+                models.ContractChecklist.type == models.ChecklistType.check_out,
+            )
+        )
+        query = query.filter(has_checkout if finished else ~has_checkout)
+
     return query.offset(skip).limit(limit).all()
 
 

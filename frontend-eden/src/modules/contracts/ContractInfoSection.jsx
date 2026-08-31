@@ -36,7 +36,8 @@ function Row({ label, children }) {
 }
 
 // section ข้อมูลสัญญา — โหมดดู + สลับเป็นโหมดแก้ (PUT /contracts/{id})
-function ContractInfoSection({ contract, onSaved }) {
+// readOnly = ดูอย่างเดียว (หน้าประวัติ) — ซ่อนปุ่มแก้ไข
+function ContractInfoSection({ contract, onSaved, readOnly = false }) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [editing, setEditing] = useState(false);
@@ -97,7 +98,7 @@ function ContractInfoSection({ contract, onSaved }) {
     <section className="border border-gray-200 rounded-xl p-5 flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <h3 className="font-semibold text-lg">ข้อมูลสัญญา</h3>
-        {!editing && (
+        {!editing && !readOnly && (
           <button
             type="button"
             onClick={startEdit}

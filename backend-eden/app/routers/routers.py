@@ -270,10 +270,11 @@ def list_contracts_route(
     skip: int = 0,
     limit: int = 100,
     tenant_id: int | None = None,
+    finished: bool | None = None,
     db: Session = Depends(get_db),
 ):
     return contracts_crud.get_contracts(
-        db=db, skip=skip, limit=limit, tenant_id=tenant_id
+        db=db, skip=skip, limit=limit, tenant_id=tenant_id, finished=finished
     )
 
 

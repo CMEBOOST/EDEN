@@ -117,11 +117,11 @@
 ## 6. Contracts — สัญญาเช่า
 
 **Backend:** `routers.py` (`contract_router`), `app/crud/contracts_crud.py`
-**Frontend:** `src/modules/contracts/` — `Contracts.jsx`, `ContractForm.jsx` (`/contracts/new`), `ContractDetail.jsx` (`/contracts/:id`) + `ContractInfoSection.jsx` / `ChecklistSection.jsx` / `ContractDocuments.jsx`
+**Frontend:** `src/modules/contracts/` — `Contracts.jsx`, `ContractForm.jsx` (`/contracts/new`), `ContractHistory.jsx` (`/contracts/history`), `ContractDetail.jsx` (`/contracts/:id` และ `/contracts/history/:id` แบบ `readOnly`) + `ContractInfoSection.jsx` / `ChecklistSection.jsx` / `ContractDocuments.jsx` (ทั้ง 3 รับ prop `readOnly`)
 
 ทำได้ตอนนี้:
 - `POST /contracts/` (staff+) — สร้างสัญญา · เช็ค `tenant_id` มีจริง, `created_by` (ถ้าส่ง) มีจริง, `end_date` ≥ `start_date` · สถานะเริ่มต้น = `draft`
-- `GET /contracts/` (staff+) — รายการ (กรองด้วย `?tenant_id=`)
+- `GET /contracts/` (staff+) — รายการ · กรองด้วย `?tenant_id=` · `?finished=true|false` (true = มี checklist `check-out` แล้ว, false = ยังไม่มี, ไม่ส่ง = ทั้งหมด)
 - `GET /contracts/{id}` (staff+) — รายสัญญา
 - `PUT /contracts/{id}` (staff+) — แก้ (`ContractUpdate`)
   - **ต่อสัญญา** = แก้ `end_date`
@@ -129,9 +129,11 @@
 - `DELETE /contracts/{id}` (admin) — ลบสัญญา (hard delete)
 - ฟิลด์: `start/end_date`, `rent`, `security_deposit`, `contract_file_url`, `special_conditions`, `status`, `room_id`
 - Frontend:
-  - หน้า `/contracts` (staff+) — ตาราง (คลิกแถว / ปุ่ม "รายละเอียด" ไปหน้า detail) + ลบ (admin) + `<RequestPanel>` (คำแจ้งความจำนง)
+  - หน้า `/contracts` (staff+) — ตาราง **เฉพาะสัญญาที่ยังไม่เสร็จสิ้น** (`?finished=false`) · คลิกแถว / ปุ่ม "รายละเอียด" ไปหน้า detail · ลบ (admin) · `<RequestPanel>` · ปุ่ม "ประวัติสัญญาเช่า" (ข้างปุ่มเพิ่มสัญญา) → `/contracts/history`
+  - หน้า `/contracts/history` (`ContractHistory`, staff+) — ตารางสัญญาที่ **เสร็จสิ้นแล้ว** (มี checklist `check-out`, `?finished=true`) · คลิกแถว → `/contracts/history/:id`
   - หน้า `/contracts/new` ฟอร์ม 3 ส่วน (ข้อมูลสัญญา + checklist check-in + เอกสาร)
   - หน้า `/contracts/:id` (`ContractDetail`) — ดู/แก้ข้อมูลสัญญา (inline, PUT) + จัดการ checklist ทุกใบ (เพิ่ม/แก้/ลบ) + เอกสารของผู้เช่า (เพิ่ม/ลบ) · การแก้สัญญาย้ายมาที่นี่ทั้งหมด (เดิม modal `ContractEditForm` — ลบทิ้งแล้ว)
+  - หน้า `/contracts/history/:id` (`ContractDetail` prop `readOnly`) — เหมือน detail แต่ดูอย่างเดียว (ซ่อนปุ่มแก้/เพิ่ม/ลบ/ลบสัญญา/ตรวจห้องออก) · ปุ่ม "← กลับ" ไป `/contracts/history` · เก็บเป็นประวัติ
 
 ยังไม่มี / หมายเหตุ:
 - ตาราง `rooms` ยังไม่มี — `room_id` เป็น nullable ไม่มี FK
@@ -139,6 +141,7 @@
 - `created_by` ยัง `null` (frontend ยังไม่ส่ง current user)
 - เอกสารในหน้า detail เป็นเอกสารระดับ **ผู้เช่า** (ใช้ร่วมทุกสัญญาของผู้เช่ารายนั้น) — ยังไม่ผูก `contract_id`
 - `expired` ต้องตั้งเอง — ยังไม่มี job อัปเดตสถานะตามวันหมดอายุ
+- "เสร็จสิ้น" ดูจาก **มี checklist `check-out`** ไม่ได้ดู `status` — สัญญาที่ admin ตั้ง `terminated` แต่ยังไม่ได้ตรวจคืนห้อง จะยังอยู่หน้า `/contracts` · พอเข้าประวัติแล้วแก้ไม่ได้ (ต้องผ่าน DB/API)
 
 ---
 

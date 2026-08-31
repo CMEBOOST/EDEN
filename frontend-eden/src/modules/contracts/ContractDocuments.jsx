@@ -15,7 +15,8 @@ const inputCls =
   "border border-gray-300 rounded px-2 py-1.5 text-sm outline-none focus:border-blue-500";
 
 // section เอกสารแนบ — เอกสารเป็นของผู้เช่า (ใช้ร่วมกับสัญญาอื่นของผู้เช่ารายเดียวกัน)
-function ContractDocuments({ tenantId }) {
+// readOnly = ดูอย่างเดียว (หน้าประวัติ) — ซ่อนปุ่มเพิ่ม/ลบ
+function ContractDocuments({ tenantId, readOnly = false }) {
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -115,44 +116,48 @@ function ContractDocuments({ tenantId }) {
               <span className="text-xs text-gray-400 shrink-0">
                 {formatDate(d.created_at)}
               </span>
-              <button
-                type="button"
-                onClick={() => setDeleting(d)}
-                className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50 shrink-0"
-              >
-                ลบ
-              </button>
+              {!readOnly && (
+                <button
+                  type="button"
+                  onClick={() => setDeleting(d)}
+                  className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50 shrink-0"
+                >
+                  ลบ
+                </button>
+              )}
             </li>
           ))}
         </ul>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
-        <select
-          value={docType}
-          onChange={(e) => setDocType(e.target.value)}
-          className={`${inputCls} w-40`}
-        >
-          {DOC_TYPES.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
-        <label className="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50 cursor-pointer">
-          {uploading ? "กำลังอัปโหลด..." : "＋ เพิ่มเอกสาร"}
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            className="hidden"
-            disabled={uploading}
-            onChange={(e) => {
-              if (e.target.files[0]) handlePick(e.target.files[0]);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      </div>
+      {!readOnly && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3">
+          <select
+            value={docType}
+            onChange={(e) => setDocType(e.target.value)}
+            className={`${inputCls} w-40`}
+          >
+            {DOC_TYPES.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+          <label className="px-3 py-1.5 text-sm rounded border border-gray-300 hover:bg-gray-50 cursor-pointer">
+            {uploading ? "กำลังอัปโหลด..." : "＋ เพิ่มเอกสาร"}
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              disabled={uploading}
+              onChange={(e) => {
+                if (e.target.files[0]) handlePick(e.target.files[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+      )}
 
       {deleting && (
         <ConfirmDialog
