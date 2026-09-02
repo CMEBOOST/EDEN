@@ -52,6 +52,8 @@ htmlcov/
 .env.*
 !.env.example
 !**/.env.example
+!.env.prod.example
+!**/.env.prod.example
 
 # -----------------------------
 # Editors / OS

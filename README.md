@@ -2,13 +2,14 @@
 
 ```
 EDEN/
-├── backend-eden/      FastAPI + SQLAlchemy + Alembic (จัดการ dependency ด้วย uv)
-├── frontend-eden/     React + Vite + Tailwind
-├── docs/              เอกสาร (ERD ฯลฯ)
-└── docker-compose.yml  postgres + pgadmin + backend + frontend
+├── backend-eden/           FastAPI + SQLAlchemy + Alembic (จัดการ dependency ด้วย uv)
+├── frontend-eden/          React + Vite + Tailwind
+├── docs/                   เอกสาร (ERD ฯลฯ)
+├── docker-compose.yml      dev — postgres + pgadmin + backend + frontend (hot reload)
+└── docker-compose.prod.yml prod — nginx (SPA + proxy /api) + backend multi-worker + migration one-shot
 ```
 
-## รันด้วย Docker (ทั้ง stack)
+## รันด้วย Docker (dev — ทั้ง stack)
 
 ```bash
 docker compose up -d --build
@@ -51,4 +52,24 @@ uv run uvicorn app.main:app --reload
 cd frontend-eden
 npm install
 npm run dev
+```
+
+## รันแบบ production
+
+```bash
+cp .env.prod.example .env          # ตั้ง POSTGRES_PASSWORD, HTTP_PORT ฯลฯ
+# ใส่ค่าจริงใน backend-eden/.env : SECRET_KEY, FIELD_ENCRYPTION_KEY
+docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml exec backend uv run python create_admin.py admin <password>
+```
+
+- เปิด `http://localhost` (หรือ `HTTP_PORT` ที่ตั้ง) — nginx เสิร์ฟ SPA + proxy `/api/*` ไป backend
+- backend / postgres **ไม่ expose** ออก host · ไม่มี pgAdmin
+- migration รันเป็น service `migrate` แยก (จบก่อน backend ขึ้น) — ไม่ผูกกับ app start
+- backend รันหลาย worker (`WEB_CONCURRENCY`, default 2)
+- แยก project จาก dev (`name: eden-prod`) → volume `eden-prod_postgres-data` / `eden-prod_uploads-data` คนละชุด
+
+**backup DB:**
+```bash
+docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U postgres EDEN_DB > backup_$(date +%F).sql
 ```

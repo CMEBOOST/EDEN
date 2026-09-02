@@ -1,0 +1,92 @@
+# Production stack — frontend build → nginx (single origin, proxy /api → backend),
+# backend multi-worker, migration เป็น service one-shot แยก
+#
+#   cp .env.prod.example .env   (แล้วตั้งค่า) · ใส่ SECRET_KEY / FIELD_ENCRYPTION_KEY จริงใน backend-eden/.env
+#   docker compose -f docker-compose.prod.yml up -d --build
+#   docker compose -f docker-compose.prod.yml exec backend uv run python create_admin.py admin <pass>
+#
+# แยก project (name) → volume/container คนละชุดกับ dev
+
+name: eden-prod
+
+services:
+  postgres:
+    image: postgres:16.15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?ต้องตั้ง POSTGRES_PASSWORD ใน .env สำหรับ prod}
+      POSTGRES_DB: ${POSTGRES_DB:-EDEN_DB}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-EDEN_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - eden-network
+
+  # one-shot — รัน migration แล้วจบ · backend รอ service นี้ exit(0) ก่อนขึ้น
+  migrate:
+    build: ./backend-eden
+    command: ["uv", "run", "alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-EDEN_DB}
+    env_file:
+      - path: ./backend-eden/.env
+        required: false
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - eden-network
+
+  backend:
+    build: ./backend-eden
+    restart: unless-stopped
+    command: ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "${WEB_CONCURRENCY:-2}"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-EDEN_DB}
+    env_file:
+      - path: ./backend-eden/.env
+        required: false
+    volumes:
+      - uploads-data:/app/uploads     # named volume — ไม่ใช่ bind mount
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - eden-network
+
+  frontend:
+    build:
+      context: ./frontend-eden
+      target: runtime
+      args:
+        VITE_API_BASE: ${VITE_API_BASE:-/api}
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - eden-network
+
+networks:
+  eden-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  uploads-data:

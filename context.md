@@ -1,7 +1,7 @@
 # EDEN — Context
 
 เอกสารสรุปบริบทโปรเจกต์ สำหรับคนใหม่ (หรือ AI assistant) อ่านให้เข้าใจภาพรวมเร็ว ๆ
-อัปเดตล่าสุด: 2026-08-30
+อัปเดตล่าสุด: 2026-09-02
 
 ---
 
@@ -9,7 +9,9 @@
 
 **ระบบจัดการหอพัก / อพาร์ตเมนต์** (My Apartment API — "ระบบจัดการหอพัก")
 เก็บข้อมูลผู้เช่า สัญญาเช่า เอกสารผู้เช่า อัตราค่าน้ำ/ไฟ และ audit log
-ยังอยู่ช่วง **เริ่มพัฒนา** — โครง data model + โครงโปรเจกต์วางเสร็จแล้ว, business logic ยังทำน้อย
+core เสร็จแล้ว — auth/RBAC, audit log, สร้างสัญญาแบบ atomic, workflow แจ้งความจำนง
+(ต่อ/ยุติสัญญา + ตรวจคืนห้อง + คิดเงินคืน), encryption at rest, DB constraints
+· **ยังขาด**: billing/มิเตอร์, tests, production build
 
 - เจ้าของ/ผู้พัฒนา: นักศึกษา ม.อุบลราชธานี (surachet.se.67@ubu.ac.th)
 - repo หลัก: `github.com/CMEBOOST/EDEN.git` (remote `origin`)
@@ -45,9 +47,9 @@ EDEN/
 │   │   └── core/
 │   │       ├── security.py    # hash_password / verify_password (bcrypt)
 │   │       ├── crypto.py      # encrypt/decrypt + EncryptedStr (Fernet) — encryption at rest ของ PII
-│   │       ├── auth.py        # JWT: create_access_token, get_current_user, require_roles/require_staff/require_admin
+│   │       ├── auth.py        # JWT: create_access_token, get_current_user, get_user_for_file, require_roles/require_staff/require_admin
 │   │       └── config.py      # SECRET_KEY / FIELD_ENCRYPTION_KEY ฯลฯ จาก .env
-│   ├── alembic/versions/      # init → unique rate → contract_requests → b33c320591bb (users.avatar_url)
+│   ├── alembic/versions/      # 7 migrations: init → unique rate → contract_requests → b33c320591bb (avatar_url) → c4f2a9b17d30 (rooms+FK) → d1c0nstra1nts (constraints) → 671e1a7f8221 (encrypt national_id)
 │   ├── alembic.ini · main.py (shim) · Dockerfile / .dockerignore
 │   ├── create_admin.py        # seed admin คนแรก
 │   ├── .env (gitignore) / .env.example
@@ -61,7 +63,7 @@ EDEN/
 │   │   ├── auth/         # AuthContext.jsx (useAuth: user/login/logout), RequireAuth.jsx
 │   │   ├── components/   # ConfirmDialog.jsx, FileDropField.jsx, AvatarPicker.jsx (พรีเซ็ต/อัปโหลด/ค่าเริ่มต้น)
 │   │   ├── layout/       # Sidebar.jsx (เมนูตาม role), Topbar.jsx (breadcrumb + user dropdown), breadcrumbs.js (crumbsFor)
-│   │   ├── pages/        # Login.jsx, About.jsx, Menu.jsx
+│   │   ├── pages/        # Login.jsx, Menu.jsx
 │   │   └── modules/
 │   │       ├── dashboard/ Dashboard.jsx (หน้า `/` — แตกตาม role: admin/staff KPI, tenant สัญญาตัวเอง)
 │   │       ├── profile/   Profile.jsx (หน้า /profile — ทุก role: avatar + เปลี่ยนรหัสตัวเอง + ข้อมูลติดต่อ [เฉพาะผู้เช่า])
@@ -69,17 +71,22 @@ EDEN/
 │   │       ├── audit/     AuditLog.jsx (/log — admin, filter user + ค้นหา + โหลดเพิ่ม)
 │   │       ├── tenants/   Tenants.jsx (list — row คลิก→detail), TenantForm.jsx (เพิ่ม), TenantDetail.jsx (/tenants/:id),
 │   │       │              TenantInfoSection.jsx (view/edit), TenantAccountSection.jsx, TenantContractsSection.jsx
-│   │       ├── contracts/ Contracts.jsx (list+แก้/ลบ + <RequestPanel>), ContractForm.jsx (/contracts/new — 3 ส่วน),
-│   │       │              ContractEditForm.jsx, ChecklistEditor.jsx (prop showCost), DocumentUploader.jsx
+│   │       ├── contracts/ Contracts.jsx (list+ลบ + <RequestPanel>), ContractForm.jsx (/contracts/new — 3 ส่วน),
+│   │       │              ContractDetail.jsx (/contracts/:id + history readOnly), ContractHistory.jsx,
+│   │       │              ContractInfoSection / ChecklistSection / ContractDocuments.jsx (รับ prop readOnly),
+│   │       │              ChecklistEditor.jsx (prop showCost), DocumentUploader.jsx
 │   │       ├── requests/  คำแจ้งความจำนง — IntentNoticeDialog (tenant), RequestPanel/RenewDialog/RejectDialog (staff),
 │   │       │              CheckoutInspection.jsx (หน้า /contracts/:id/checkout), requestMeta.js
 │   │       └── rates/     Rates.jsx (list+CRUD ค่าน้ำ/ค่าไฟ), RateForm.jsx
 │   ├── assets/           # รูป avatar ตั้งต้น: adminIcon.png / maleIcon.png / femaleIcon.png (นอก src/ แต่ใน Vite root — import ได้)
-│   ├── Dockerfile
+│   ├── Dockerfile        # multi-stage: deps → dev (Vite server) / build / runtime (nginx)
+│   ├── nginx.conf        # prod — SPA fallback + proxy /api/ → backend
 │   └── package.json / vite.config.js
 │
 ├── docs/database_erd.drawio   # ERD (เปิดด้วย diagrams.net / Draw.io extension)
-├── docker-compose.yml
+├── docker-compose.yml        # dev (hot reload)
+├── docker-compose.prod.yml   # prod (nginx + multi-worker + migrate one-shot)
+├── .env.example / .env.prod.example
 ├── README.md
 └── context.md                # ← ไฟล์นี้
 ```
@@ -97,7 +104,7 @@ Source of truth = [backend-eden/app/models/models.py](backend-eden/app/models/mo
 | ตาราง | PK | คอลัมน์สำคัญ | FK |
 |---|---|---|---|
 | `users` | user_id | username (uq), password_hash, role, is_active, avatar_url | — |
-| `tenants` | tenant_id | full_name, phone, email, national_id_encrypted, last_login_at | user_id → users |
+| `tenants` | tenant_id | full_name, phone, email, national_id_encrypted (Fernet ผ่าน `EncryptedStr`), last_login_at · **user_id UNIQUE** | user_id → users |
 | `tenant_documents` | doc_id | doc_type, file_url | tenant_id → tenants, uploaded_by → users |
 | `contracts` | contract_id | start/end_date, rent, security_deposit, status, room_id (nullable) | tenant_id → tenants, created_by → users, room_id → rooms (ON DELETE SET NULL) |
 | `rooms` | room_id (= เลขห้อง) | floor, base_rent · seed 101–110/201–210/301–310/401–410 (demo, ผ่าน migration) · สถานะว่าง/ไม่ว่างคำนวณสดจาก contracts | — |
@@ -137,9 +144,9 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | PATCH | `/users/{id}/password` | admin ตั้งรหัสผ่านใหม่ให้โดยตรง (`{new_password}` ≥6 ตัว) |
 | POST | `/upload/` | อัปโหลดไฟล์ 1 ไฟล์ (multipart `file`) → `{url, filename}` · จำกัด jpg/png/webp/gif/pdf ≤ 10MB |
 | GET | `/uploads/<name>` | เสิร์ฟไฟล์อัปโหลด (`backend-eden/uploads/`) — **ต้องล็อกอิน** (token ทาง header หรือ `?token=`) |
-| POST/GET | `/tenants/` | สร้าง / list · create: user ต้อง role=tenant (400), ยังไม่ผูก tenant อื่น (409) |
-| GET/PUT/DELETE | `/tenants/{id}` | อ่าน / แก้ (`TenantUpdate`) / ลบ |
-| POST/GET | `/tenants/{id}/documents` | เอกสารของผู้เช่า (`{doc_type, file_url, uploaded_by?}`) |
+| POST/GET | `/tenants/` | สร้าง / list (`TenantSummary` — ไม่มี `national_id`) · create: user ต้อง role=tenant (400), ยังไม่ผูก tenant อื่น (409) |
+| GET/PUT/DELETE | `/tenants/{id}` | อ่าน / แก้ (`TenantUpdate`) / ลบ — GET/PUT คืน `TenantOut` (มี `national_id` decrypt แล้ว) |
+| POST/GET | `/tenants/{id}/documents` | เอกสารของผู้เช่า (`{doc_type, file_url}` — `uploaded_by` เซ็ตจาก current user) |
 | DELETE | `/documents/{doc_id}` | ลบเอกสาร |
 | POST/GET | `/contracts/` | สร้าง (atomic: `+checkin_items, tenant_signature, documents` ในทรานแซกชันเดียว) / list (`tenant_id`, `finished`) · เช็ค tenant + วันที่ + ห้องว่าง (409) |
 | POST | `/contracts/run-expire` | (admin) ตั้งสัญญา active ที่เลย end_date → expired · คืน `{expired: N}` |
@@ -278,7 +285,7 @@ npm run dev
 - [x] pin image เวอร์ชันทุกตัว · healthcheck backend · root `.env` สำหรับ compose (port/password)
 - [x] CI — `.github/workflows/ci.yml` (backend: pyright + alembic upgrade · frontend: eslint + vite build)
 - [x] `VITE_API_BASE` ตั้งผ่าน env — `frontend-eden/.env.example` · Dockerfile `ARG`+`ENV` · compose `frontend.build.args` + `environment` (ค่าจาก `${VITE_API_BASE}` ที่ root `.env`) · `lib/api.js` อ่านอยู่แล้ว · default `http://localhost:8000`
-- [ ] production Dockerfile (ตอนนี้ dev mode: `uvicorn --reload`, `npm run dev`) — frontend build → nginx, backend `--workers`, migration แยกเป็น one-shot
+- [x] production stack — `docker-compose.prod.yml` + `frontend-eden/Dockerfile` multi-stage (`dev`/`build`/`runtime`) · frontend build → nginx (SPA fallback + proxy `/api/` → backend, single origin) · backend `uvicorn --workers ${WEB_CONCURRENCY}` · migration = service `migrate` one-shot (`service_completed_successfully`) · uploads = named volume · backend/postgres ไม่ expose · `.env.prod.example`
 - [ ] backup Postgres (pg_dump cron) · แยก pgadmin เป็น compose profile
 
 ---
@@ -289,4 +296,6 @@ npm run dev
 - Alembic migration มี 7 อัน (chain เดียว, head `671e1a7f8221` = encrypt national_id) · init downgrade drop enum type ให้แล้ว (`downgrade base && upgrade head` ได้)
 - `_enum_col()` ใน models.py จำเป็น — ถ้าใช้ `SAEnum(MyEnum)` ตรง ๆ Postgres จะเก็บ *ชื่อ member* (`check_in`) ไม่ใช่ *value* (`check-in`)
 - repo ไม่มี `.gitattributes` → มี warning LF/CRLF เวลา `git add` บน Windows (ไม่กระทบอะไร)
-- `.gitignore` ซ่อน `.env*` ทั้งหมด ยกเว้น `**/.env.example` (negation) — ไฟล์ `.env` จริงไม่เคยเข้า git
+- `.gitignore` ซ่อน `.env*` ทั้งหมด ยกเว้น `**/.env.example` + `**/.env.prod.example` (negation) — ไฟล์ `.env` จริงไม่เคยเข้า git
+- **dev vs prod compose:** `frontend-eden/Dockerfile` เป็น multi-stage · dev compose ต้องระบุ `build.target: dev` (ไม่งั้นได้ stage สุดท้าย = nginx) · prod ใช้ `docker-compose.prod.yml` (`target: runtime`) — คนละ project (`eden-prod`), volume คนละชุด, backend อ่าน secret จาก `backend-eden/.env` เหมือนกัน
+- prod: `VITE_API_BASE=/api` (nginx proxy strip prefix ไป `backend:8000`) — ไม่ต้องแตะ CORS · dev: `http://localhost:8000` (เรียกตรง)

@@ -1,25 +1,25 @@
-# ใช้ Node.js เวอร์ชัน 20 บน Alpine Linux เพื่อให้ไฟล์มีขนาดเล็ก (pin minor)
-FROM node:20.20-alpine
-
-# ตั้งค่า Working Directory ใน Container
+# ---- deps: ติดตั้ง dependency (แยก layer ไว้ใช้ cache) ----
+FROM node:20.20-alpine AS deps
 WORKDIR /app
-
-# base URL ของ backend — ส่งผ่าน --build-arg / compose build.args
-# Vite inline ค่านี้ตอน build · dev server (npm run dev) ก็อ่านจาก ENV นี้
-ARG VITE_API_BASE=http://localhost:8000
-ENV VITE_API_BASE=$VITE_API_BASE
-
-# ก๊อปปี้ไฟล์ package.json และ package-lock.json เข้าไปก่อน (แยก layer ไว้ใช้ cache)
 COPY package*.json ./
-
-# ติดตั้ง Dependencies แบบตรงตาม lock file (reproducible)
 RUN npm ci
 
-# ก๊อปปี้ไฟล์ทั้งหมดในโปรเจกต์เข้าไป
+# ---- dev: Vite dev server (docker-compose.yml ชี้ target นี้) ----
+FROM deps AS dev
 COPY . .
-
-# เปิดพอร์ต 5173
 EXPOSE 5173
-
-# คำสั่งรันเมื่อ Start Container
 CMD ["npm", "run", "dev"]
+
+# ---- build: สร้าง static bundle ----
+FROM deps AS build
+# base URL ของ backend — Vite inline ตอน build (prod ใช้ /api ผ่าน nginx proxy)
+ARG VITE_API_BASE=/api
+ENV VITE_API_BASE=$VITE_API_BASE
+COPY . .
+RUN npm run build
+
+# ---- runtime: nginx เสิร์ฟ dist (stage สุดท้าย = default target) ----
+FROM nginx:1.27-alpine AS runtime
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80
