@@ -6,16 +6,24 @@ from ..models import models
 from ..schemas import schemas
 
 
-def create_rate(db: Session, rate: schemas.RateConfig):
+def create_rate(
+    db: Session,
+    rate: schemas.RateConfig,
+    created_by: int | None = None,
+    commit: bool = True,
+):
     new_rate = models.RateConfig(
         type=rate.type,
         rate_value=rate.rate_value,
         effective_date=rate.effective_date,
-        created_by=rate.created_by,
+        created_by=created_by,
     )
     db.add(new_rate)
-    db.commit()
-    db.refresh(new_rate)
+    if commit:
+        db.commit()
+        db.refresh(new_rate)
+    else:
+        db.flush()
     return new_rate
 
 

@@ -4,7 +4,13 @@ from ..models import models
 from ..schemas import schemas
 
 
-def create_checklist(db: Session, contract_id: int, data: schemas.ChecklistCreate):
+def create_checklist(
+    db: Session,
+    contract_id: int,
+    data: schemas.ChecklistCreate,
+    created_by: int | None = None,
+    commit: bool = True,
+):
     items = [item.model_dump() for item in data.items]
     photo_urls = [url for item in data.items for url in item.photos]
 
@@ -14,11 +20,14 @@ def create_checklist(db: Session, contract_id: int, data: schemas.ChecklistCreat
         checklist_items=items,
         photo_urls=photo_urls,
         tenant_signature=data.tenant_signature,
-        created_by=data.created_by,
+        created_by=created_by,
     )
     db.add(new_checklist)
-    db.commit()
-    db.refresh(new_checklist)
+    if commit:
+        db.commit()
+        db.refresh(new_checklist)
+    else:
+        db.flush()
     return new_checklist
 
 

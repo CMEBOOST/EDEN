@@ -107,7 +107,6 @@ class TenantDocument(BaseModel):
 class DocumentCreate(BaseModel):
     doc_type: str
     file_url: str
-    uploaded_by: int | None = None
 
 
 class RoomOut(BaseModel):
@@ -116,6 +115,14 @@ class RoomOut(BaseModel):
     base_rent: float
     status: str           # "available" | "occupied"
     contract_id: int | None = None   # สัญญาที่ผูกอยู่ (ถ้า occupied)
+
+
+class ChecklistItem(BaseModel):
+    name: str
+    status: str = "ปกติ"
+    note: str | None = None
+    photos: list[str] = []
+    cost: float = 0  # ค่าเสียหายรายรายการ (ใช้ตอนตรวจสภาพห้องออก)
 
 
 class Contracts(BaseModel):
@@ -128,7 +135,10 @@ class Contracts(BaseModel):
     contract_file_url: str | None = None
     special_conditions: str | None = None
     status: ContractStatus = ContractStatus.draft
-    created_by: int | None = None
+    # สร้างพร้อมกันในทรานแซกชันเดียว (optional)
+    checkin_items: list[ChecklistItem] = []
+    tenant_signature: str | None = None
+    documents: list[DocumentCreate] = []
 
 
 class ContractUpdate(BaseModel):
@@ -143,19 +153,10 @@ class ContractUpdate(BaseModel):
     status: ContractStatus | None = None
 
 
-class ChecklistItem(BaseModel):
-    name: str
-    status: str = "ปกติ"
-    note: str | None = None
-    photos: list[str] = []
-    cost: float = 0  # ค่าเสียหายรายรายการ (ใช้ตอนตรวจสภาพห้องออก)
-
-
 class ChecklistCreate(BaseModel):
     type: ChecklistType = ChecklistType.check_in
     items: list[ChecklistItem] = []
     tenant_signature: str | None = None
-    created_by: int | None = None
 
 
 class ChecklistUpdate(BaseModel):
@@ -184,7 +185,6 @@ class RateConfig(BaseModel):
     type: RateType
     rate_value: float
     effective_date: datetime.date
-    created_by: int | None = None
 
 
 class RateConfigUpdate(BaseModel):

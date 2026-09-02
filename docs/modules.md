@@ -97,7 +97,8 @@
 
 ยังไม่มี / หมายเหตุ:
 - `national_id_encrypted` ยังเก็บ plaintext (ยังไม่เข้ารหัสจริง) และ `GET /tenants/` ยังคืนค่านี้ออกมา (ยังไม่มี response schema แยก)
-- `last_login_at` มีคอลัมน์แต่ยังไม่มีการอัปเดต
+- `last_login_at` — อัปเดตตอน tenant ล็อกอิน (`login_route`)
+- `tenants.user_id` มี UNIQUE constraint แล้ว (1 บัญชี ↔ 1 ผู้เช่า)
 
 ---
 
@@ -138,8 +139,9 @@
   - หน้า `/contracts/history/:id` (`ContractDetail` prop `readOnly`) — เหมือน detail แต่ดูอย่างเดียว (ซ่อนปุ่มแก้/เพิ่ม/ลบ/ลบสัญญา/ตรวจห้องออก) · ปุ่ม "← กลับ" ไป `/contracts/history` · เก็บเป็นประวัติ
 
 ยังไม่มี / หมายเหตุ:
-- ฟอร์มสร้างสัญญาไม่มี transaction — ถ้า checklist/เอกสารพังหลังสร้างสัญญาแล้ว จะได้ข้อมูลไม่ครบ
-- `created_by` ยัง `null` (frontend ยังไม่ส่ง current user)
+- `POST /contracts/` = **atomic** — รับ `checkin_items` + `tenant_signature` + `documents` ใน body เดียว สร้างพร้อมกันในทรานแซกชันเดียว (fail = rollback หมด) · `created_by` เซ็ตจาก current user
+- `POST /contracts/run-expire` (admin) — ตั้งสัญญา `active` ที่เลย `end_date` เป็น `expired` คืน `{expired: N}` (เอาไป cron วันละครั้ง)
+- constraint กันข้อมูลพัง: 1 ห้อง มีสัญญา draft/active ได้ใบเดียว (partial unique index) · CHECK `end_date >= start_date`, `rent/deposit >= 0`
 - เอกสารในหน้า detail เป็นเอกสารระดับ **ผู้เช่า** (ใช้ร่วมทุกสัญญาของผู้เช่ารายนั้น) — ยังไม่ผูก `contract_id`
 - `expired` ต้องตั้งเอง — ยังไม่มี job อัปเดตสถานะตามวันหมดอายุ
 - "เสร็จสิ้น" ดูจาก **มี checklist `check-out`** ไม่ได้ดู `status` — สัญญาที่ admin ตั้ง `terminated` ด้วยมือแต่ยังไม่ได้ตรวจคืนห้อง จะยังอยู่หน้า `/contracts` · พอเข้าประวัติแล้วแก้ไม่ได้ (ต้องผ่าน DB/API)
@@ -297,7 +299,7 @@
 - `app/models/models.py` — ORM models ทั้งหมด (source of truth ของ schema) + enums + `TimestampMixin` + `_enum_col`
 - `app/schemas/schemas.py` — Pydantic schemas (request/response)
 - `app/crud/*` — logic เข้าถึง DB แยกตาม entity
-- `alembic/versions/` — migration: init → unique rate → contract_requests → `b33c320591bb` (`users.avatar_url`) → `c4f2a9b17d30` (`rooms` + `contracts.room_id` FK)
+- `alembic/versions/` — init → unique rate → contract_requests → avatar_url → `c4f2a9b17d30` (rooms + FK) → `d1c0nstra1nts` (data-integrity constraints)
 - `create_admin.py` — seed admin คนแรก
 
 ### Frontend `src/lib/` + `src/auth/` + `src/layout/` + `src/components/`
@@ -324,8 +326,7 @@
 - **Rooms** — มีตาราง `rooms` แล้ว (demo, seed คงที่) แต่ยังไม่มีหน้าจัดการห้อง / สถานะ "ปิดปรับปรุง"
 - **บิล / ใบแจ้งหนี้ / มิเตอร์น้ำ-ไฟ** — มีแค่ "อัตรา" ยังไม่มีการออกบิล
 - **การเข้ารหัสบัตรประชาชนจริง** — `national_id_encrypted` ยัง plaintext
-- **`created_by` / `uploaded_by`** — ยังไม่ถูกบันทึกจาก current user
-- **สถานะสัญญาอัตโนมัติ** — ไม่มี job ตั้ง `expired` ตามวันหมดอายุ
+- **สถานะสัญญาอัตโนมัติ** — มี `POST /contracts/run-expire` แล้ว แต่ยังต้องตั้ง cron เอง (ไม่มี scheduler ในแอป)
 - **Tests** — ยังไม่มี unit/integration test
 - **State management ฝั่ง frontend** — ยัง fetch ใน `useEffect` ต่อหน้า
 - **Production build** — ยังเป็น dev mode (`uvicorn --reload`, `npm run dev`), `VITE_API_BASE` ยัง hardcode `http://localhost:8000`

@@ -1,6 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import IntegrityError
 
 from .core.audit import AuditMiddleware
 from .core.errors import ErrorHandlerMiddleware
@@ -31,6 +33,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(IntegrityError)
+async def _integrity_error(request: Request, exc: IntegrityError):
+    """DB constraint ยิง (unique / check / fk) → 409 แทน 500"""
+    return JSONResponse(
+        status_code=409, content={"detail": "ข้อมูลขัดแย้งกับข้อมูลที่มีอยู่"}
+    )
+
 
 # เสิร์ฟไฟล์อัปโหลด (รูป checklist / เอกสาร) ที่ /uploads
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")

@@ -4,16 +4,25 @@ from ..models import models
 from ..schemas import schemas
 
 
-def create_document(db: Session, tenant_id: int, data: schemas.DocumentCreate):
+def create_document(
+    db: Session,
+    tenant_id: int,
+    data: schemas.DocumentCreate,
+    uploaded_by: int | None = None,
+    commit: bool = True,
+):
     new_doc = models.TenantDocument(
         tenant_id=tenant_id,
         doc_type=data.doc_type,
         file_url=data.file_url,
-        uploaded_by=data.uploaded_by,
+        uploaded_by=uploaded_by,
     )
     db.add(new_doc)
-    db.commit()
-    db.refresh(new_doc)
+    if commit:
+        db.commit()
+        db.refresh(new_doc)
+    else:
+        db.flush()
     return new_doc
 
 

@@ -117,8 +117,8 @@ function ContractForm() {
         contractFileUrl = (await apiUpload(contractFile)).url;
       }
 
-      // 2. สัญญา
-      const created = await apiPost("/contracts/", {
+      // 2. สัญญา + checklist check-in + เอกสาร — ทรานแซกชันเดียว (atomic)
+      await apiPost("/contracts/", {
         tenant_id: Number(contract.tenant_id),
         room_id: contract.room_id ? Number(contract.room_id) : null,
         start_date: contract.start_date,
@@ -128,26 +128,12 @@ function ContractForm() {
         status: contract.status,
         special_conditions: contract.special_conditions.trim() || null,
         contract_file_url: contractFileUrl,
+        checkin_items: checklist.filter((r) => r.name.trim()),
+        tenant_signature: signature.trim() || null,
+        documents: documents
+          .filter((d) => d.file_url)
+          .map((d) => ({ doc_type: d.doc_type, file_url: d.file_url })),
       });
-      const contractId = created.contract_id;
-
-      // 3. checklist สภาพห้อง (เฉพาะรายการที่ตั้งชื่อ)
-      const items = checklist.filter((r) => r.name.trim());
-      if (items.length || signature.trim()) {
-        await apiPost(`/contracts/${contractId}/checklists`, {
-          type: "check-in",
-          tenant_signature: signature.trim() || null,
-          items,
-        });
-      }
-
-      // 4. เอกสาร (เฉพาะที่แนบไฟล์แล้ว)
-      for (const doc of documents.filter((d) => d.file_url)) {
-        await apiPost(`/tenants/${contract.tenant_id}/documents`, {
-          doc_type: doc.doc_type,
-          file_url: doc.file_url,
-        });
-      }
 
       navigate("/contracts");
     } catch (err) {

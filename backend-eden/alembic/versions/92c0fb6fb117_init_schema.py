@@ -159,3 +159,11 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_users_user_id'), table_name='users')
     op.drop_table('users')
     # ### end Alembic commands ###
+    # drop enum types ที่ create_table สร้างไว้ (ไม่งั้น upgrade ซ้ำจะเจอ "type already exists")
+    for _enum in (
+        "checklist_type_enum",
+        "rate_type_enum",
+        "contract_status_enum",
+        "role_enum",
+    ):
+        op.execute(f"DROP TYPE IF EXISTS {_enum}")

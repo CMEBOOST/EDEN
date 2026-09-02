@@ -4,16 +4,19 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from sqlalchemy import (
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
+    Index,
     JSON,
     Numeric,
     String,
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 
 from ..database import Base
@@ -112,6 +115,8 @@ class Users(TimestampMixin, Base):
 # ---------------------------------------------------------------------------
 class Tenants(TimestampMixin, Base):
     __tablename__ = "tenants"
+    # 1 บัญชีผู้ใช้ ↔ 1 ผู้เช่า
+    __table_args__ = (UniqueConstraint("user_id", name="uq_tenants_user_id"),)
 
     tenant_id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
@@ -167,6 +172,21 @@ class Room(Base):
 # ---------------------------------------------------------------------------
 class Contracts(TimestampMixin, Base):
     __tablename__ = "contracts"
+    __table_args__ = (
+        # 1 ห้อง มีสัญญาที่ยังไม่จบ (draft/active) ได้ใบเดียว
+        Index(
+            "uq_contract_room_active",
+            "room_id",
+            unique=True,
+            postgresql_where=text(
+                "room_id IS NOT NULL AND status IN ('draft', 'active')"
+            ),
+        ),
+        CheckConstraint("end_date >= start_date", name="ck_contract_dates"),
+        CheckConstraint(
+            "rent >= 0 AND security_deposit >= 0", name="ck_contract_amounts"
+        ),
+    )
 
     contract_id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
@@ -261,6 +281,7 @@ class RateConfig(TimestampMixin, Base):
     # 1 อัตราต่อ 1 ประเภท ต่อ 1 วันมีผล — กันตั้งซ้อนวันเดียวกัน
     __table_args__ = (
         UniqueConstraint("type", "effective_date", name="uq_rate_type_date"),
+        CheckConstraint("rate_value >= 0", name="ck_rate_value_nonneg"),
     )
 
     rate_id: Mapped[int] = mapped_column(primary_key=True, index=True)

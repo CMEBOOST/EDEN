@@ -2,6 +2,8 @@ import datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..core.auth import (
@@ -53,6 +55,11 @@ def login_route(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="บัญชีนี้ถูกปิดการใช้งาน")
     audit_crud.write(db, user.user_id, "เข้าสู่ระบบ")
+    # บันทึกเวลาล็อกอินล่าสุด (เฉพาะผู้เช่า — คอลัมน์อยู่บน tenants)
+    tenant = tenent_crud.get_tenant_by_user(db, user.user_id)
+    if tenant is not None:
+        tenant.last_login_at = func.now()
+        db.commit()
     return schemas.Token(access_token=create_access_token(user.username))
 
 
@@ -191,7 +198,13 @@ def create_tenant_route(tenant: schemas.Tenants, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=409, detail="บัญชีนี้ลงทะเบียนผู้เช่าไว้แล้ว"
         )
-    return tenent_crud.create_tenant(db=db, tenant=tenant)
+    try:
+        return tenent_crud.create_tenant(db=db, tenant=tenant)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="บัญชีนี้ลงทะเบียนผู้เช่าไว้แล้ว"
+        )
 
 
 @tenant_router.get("/")
@@ -232,11 +245,16 @@ def delete_tenant_route(tenant_id: int, db: Session = Depends(get_db)):
 # --- เอกสารของผู้เช่า ---
 @tenant_router.post("/{tenant_id}/documents", dependencies=_staff)
 def create_document_route(
-    tenant_id: int, data: schemas.DocumentCreate, db: Session = Depends(get_db)
+    tenant_id: int,
+    data: schemas.DocumentCreate,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(require_staff),
 ):
     if tenent_crud.get_tenant(db=db, tenant_id=tenant_id) is None:
         raise HTTPException(status_code=404, detail="ไม่พบผู้เช่า")
-    return document_crud.create_document(db=db, tenant_id=tenant_id, data=data)
+    return document_crud.create_document(
+        db=db, tenant_id=tenant_id, data=data, uploaded_by=me.user_id
+    )
 
 
 @tenant_router.get("/{tenant_id}/documents")
@@ -253,7 +271,7 @@ def delete_document_route(doc_id: int, db: Session = Depends(get_db)):
     doc = document_crud.delete_document(db=db, doc_id=doc_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="ไม่พบเอกสาร")
-    return {"delete": "ok"}
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -263,14 +281,14 @@ contract_router = APIRouter(prefix="/contracts", tags=["Contracts"], dependencie
 
 
 @contract_router.post("/", dependencies=_staff)
-def create_contract_route(contract: schemas.Contracts, db: Session = Depends(get_db)):
+def create_contract_route(
+    contract: schemas.Contracts,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(require_staff),
+):
+    """สร้างสัญญา + checklist check-in + เอกสาร ในทรานแซกชันเดียว (atomic)"""
     if tenent_crud.get_tenant(db=db, tenant_id=contract.tenant_id) is None:
         raise HTTPException(status_code=400, detail="ไม่พบ tenant_id นี้")
-    if (
-        contract.created_by is not None
-        and user_crud.get_user_by_id(db=db, user_id=contract.created_by) is None
-    ):
-        raise HTTPException(status_code=400, detail="ไม่พบ created_by (user_id) นี้")
     if contract.end_date < contract.start_date:
         raise HTTPException(status_code=400, detail="end_date ต้องไม่ก่อน start_date")
     if contract.room_id is not None:
@@ -282,7 +300,45 @@ def create_contract_route(contract: schemas.Contracts, db: Session = Depends(get
                 status_code=409,
                 detail=f"ห้อง {contract.room_id} มีสัญญาอยู่แล้ว (#{busy})",
             )
-    return contracts_crud.create_contract(db=db, contract=contract)
+
+    try:
+        new_contract = contracts_crud.create_contract(
+            db=db, contract=contract, created_by=me.user_id, commit=False
+        )
+        if contract.checkin_items or contract.tenant_signature:
+            checklist_crud.create_checklist(
+                db=db,
+                contract_id=new_contract.contract_id,
+                data=schemas.ChecklistCreate(
+                    type=ChecklistType.check_in,
+                    items=contract.checkin_items,
+                    tenant_signature=contract.tenant_signature,
+                ),
+                created_by=me.user_id,
+                commit=False,
+            )
+        for doc in contract.documents:
+            document_crud.create_document(
+                db=db,
+                tenant_id=contract.tenant_id,
+                data=doc,
+                uploaded_by=me.user_id,
+                commit=False,
+            )
+        db.commit()
+        db.refresh(new_contract)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409, detail="ข้อมูลขัดแย้ง (เช่น ห้องถูกใช้ไปแล้ว)"
+        )
+    return new_contract
+
+
+@contract_router.post("/run-expire", dependencies=_admin)
+def run_expire_route(db: Session = Depends(get_db)):
+    """ตั้งสัญญา active ที่เลย end_date เป็น expired — เอาไป cron วันละครั้ง"""
+    return {"expired": contracts_crud.expire_overdue(db)}
 
 
 @contract_router.get("/")
@@ -316,6 +372,16 @@ def update_contract_route(
     # ยุติสัญญา (terminated) = เฉพาะ admin (UC3.5)
     if data.status == ContractStatus.terminated and me.role != models.Role.admin:
         raise HTTPException(status_code=403, detail="เฉพาะผู้ดูแลระบบยุติสัญญาได้")
+
+    current = contracts_crud.get_contract(db=db, contract_id=contract_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="ไม่พบสัญญา")
+
+    new_start = data.start_date or current.start_date
+    new_end = data.end_date or current.end_date
+    if new_end < new_start:
+        raise HTTPException(status_code=400, detail="end_date ต้องไม่ก่อน start_date")
+
     if data.room_id is not None:
         if not room_crud.room_exists(db=db, room_id=data.room_id):
             raise HTTPException(status_code=400, detail="ไม่พบห้องนี้")
@@ -327,7 +393,13 @@ def update_contract_route(
                 status_code=409,
                 detail=f"ห้อง {data.room_id} มีสัญญาอยู่แล้ว (#{busy})",
             )
-    contract = contracts_crud.update_contract(db=db, contract_id=contract_id, data=data)
+    try:
+        contract = contracts_crud.update_contract(
+            db=db, contract_id=contract_id, data=data
+        )
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="ข้อมูลขัดแย้ง")
     if contract is None:
         raise HTTPException(status_code=404, detail="ไม่พบสัญญา")
     return contract
@@ -338,20 +410,23 @@ def delete_contract_route(contract_id: int, db: Session = Depends(get_db)):
     contract = contracts_crud.delete_contract(db=db, contract_id=contract_id)
     if contract is None:
         raise HTTPException(status_code=404, detail="ไม่พบสัญญา")
-    return {"delete": "ok"}
+    return {"ok": True}
 
 
 # --- checklist สภาพห้อง ---
 @contract_router.post("/{contract_id}/checklists", dependencies=_staff)
 def create_checklist_route(
-    contract_id: int, data: schemas.ChecklistCreate, db: Session = Depends(get_db)
+    contract_id: int,
+    data: schemas.ChecklistCreate,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(require_staff),
 ):
     contract = contracts_crud.get_contract(db=db, contract_id=contract_id)
     if contract is None:
         raise HTTPException(status_code=404, detail="ไม่พบสัญญา")
 
     checklist = checklist_crud.create_checklist(
-        db=db, contract_id=contract_id, data=data
+        db=db, contract_id=contract_id, data=data, created_by=me.user_id, commit=False
     )
 
     # ตรวจคืนห้อง (check-out) = สิ้นสุดกระบวนการเช่า → ยุติสัญญาอัตโนมัติ
@@ -361,8 +436,9 @@ def create_checklist_route(
         ContractStatus.active,
     ):
         contract.status = ContractStatus.terminated
-        db.commit()
 
+    db.commit()
+    db.refresh(checklist)
     return checklist
 
 
@@ -392,7 +468,7 @@ def delete_checklist_route(
     if existing is None or existing.contract_id != contract_id:
         raise HTTPException(status_code=404, detail="ไม่พบบันทึกสภาพห้อง")
     checklist_crud.delete_checklist(db=db, cc_id=cc_id)
-    return {"delete": "ok"}
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +499,11 @@ rate_router = APIRouter(prefix="/rates", tags=["Rates"], dependencies=_auth)
 
 
 @rate_router.post("/", dependencies=_admin)
-def create_rate_route(rate: schemas.RateConfig, db: Session = Depends(get_db)):
+def create_rate_route(
+    rate: schemas.RateConfig,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(require_admin),
+):
     dup = rate_crud.rate_exists(db, rate.type, rate.effective_date)
     if dup is not None:
         raise HTTPException(
@@ -433,7 +513,7 @@ def create_rate_route(rate: schemas.RateConfig, db: Session = Depends(get_db)):
                 "existing_rate_id": dup.rate_id,
             },
         )
-    return rate_crud.create_rate(db=db, rate=rate)
+    return rate_crud.create_rate(db=db, rate=rate, created_by=me.user_id)
 
 
 @rate_router.get("/", dependencies=_staff)
@@ -488,7 +568,7 @@ def delete_rate_route(rate_id: int, db: Session = Depends(get_db)):
     rate = rate_crud.delete_rate(db=db, rate_id=rate_id)
     if rate is None:
         raise HTTPException(status_code=404, detail="ไม่พบอัตราค่าบริการ")
-    return {"delete": "ok"}
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------------------

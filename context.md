@@ -140,8 +140,9 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | GET/PUT/DELETE | `/tenants/{id}` | อ่าน / แก้ (`TenantUpdate`) / ลบ |
 | POST/GET | `/tenants/{id}/documents` | เอกสารของผู้เช่า (`{doc_type, file_url, uploaded_by?}`) |
 | DELETE | `/documents/{doc_id}` | ลบเอกสาร |
-| POST/GET | `/contracts/` | สร้าง / list (query `tenant_id`) · create เช็ค tenant + วันที่ |
-| GET/PUT/DELETE | `/contracts/{id}` | อ่าน / แก้ (`ContractUpdate`) / ลบ |
+| POST/GET | `/contracts/` | สร้าง (atomic: `+checkin_items, tenant_signature, documents` ในทรานแซกชันเดียว) / list (`tenant_id`, `finished`) · เช็ค tenant + วันที่ + ห้องว่าง (409) |
+| POST | `/contracts/run-expire` | (admin) ตั้งสัญญา active ที่เลย end_date → expired · คืน `{expired: N}` |
+| GET/PUT/DELETE | `/contracts/{id}` | อ่าน / แก้ (`ContractUpdate` — re-check วันที่) / ลบ |
 | POST/GET | `/contracts/{id}/checklists` | บันทึกสภาพห้อง — `{type: check-in\|check-out, items:[{name,status,note,photos,cost}], tenant_signature?}` → เก็บ `checklist_items` (JSON) + `photo_urls` (flat) · `cost` = ค่าเสียหายรายรายการ (ใช้ตอน check-out) |
 | POST/GET | `/contract-requests/` | คำแจ้งความจำนง — POST `{contract_id, request_type: renew\|terminate, tenant_note, preferred_date?}` (tenant = สัญญาตัวเอง, ซ้ำ→409) · GET tenant เห็นของตัวเอง / staff+ เห็นหมด (query `status`) |
 | GET/PATCH/DELETE | `/contract-requests/{id}` | GET (tenant เจ้าของ/staff+) · PATCH (staff+) `{status, staff_note, preferred_date, damage_total}` — completed+terminate ต้องมี checklist check-out ก่อน (400) · DELETE = ยกเลิกคำแจ้ง (tenant ยกเลิกได้เฉพาะของตัวเองที่ status=pending / staff+ ลบได้ทุกอัน) |
@@ -162,7 +163,7 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 
 **Audit log:** `AuditMiddleware` ([app/core/audit.py](backend-eden/app/core/audit.py)) บันทึกทุก request ที่ method เป็น POST/PUT/PATCH/DELETE + สำเร็จ (2xx) ลง `audit_logs` โดย decode token เอาว่าใครทำ + `describe()` แปลง method+path เป็นข้อความไทย · login บันทึกแยกใน route
 
-> `/tenants/` ยังคืน `national_id_encrypted` (ยังไม่มี response schema แยก) · `created_by`/`uploaded_by` ยัง `null` (ยังไม่ set จาก current user)
+> `/tenants/` ยังคืน `national_id_encrypted` (ยังไม่มี response schema แยก) · `created_by`/`uploaded_by`/`last_login_at` เซ็ตจาก current user แล้ว
 
 ---
 
@@ -245,11 +246,14 @@ npm run dev
 - [x] `UserOut` (ไม่มี password_hash) · secret ไป `.env`
 - [x] audit log — middleware บันทึกทุก write อัตโนมัติ
 - [x] คำแจ้งความจำนง (UC3.8 ต่อสัญญา / ยุติสัญญา) — `contract_requests` + `/contract-requests/*` · ต่อ = ขยาย end_date · ยุติ = ตรวจห้องออก (`ChecklistItem.cost`) + คิดเงินคืน
-- [ ] เก็บ `created_by`/`uploaded_by` จาก current user (ตอนนี้ frontend ยังไม่ส่ง)
+- [x] เก็บ `created_by`/`uploaded_by`/`last_login_at` จาก current user (backend เซ็ตเอง ไม่รับจาก client)
+- [x] DB constraint: `tenants.user_id` unique · 1 ห้อง–1 สัญญา active · CHECK วันที่/ค่าเงิน ≥ 0 · IntegrityError → 409
+- [x] สร้างสัญญา atomic — `POST /contracts/` รับ checklist check-in + เอกสาร ในทรานแซกชันเดียว
+- [x] `POST /contracts/run-expire` (admin) — ตั้ง active ที่เลย end_date เป็น expired (เอาไป cron)
 - [ ] response schema แยกสำหรับ tenants (`/tenants/` ยังคืน `national_id_encrypted`)
 - [ ] ตาราง `rooms` + ผูก FK `contracts.room_id`
 - [ ] เข้ารหัส `national_id_encrypted` จริง (ตอนนี้เป็นแค่ชื่อคอลัมน์)
-- [ ] ContractForm submit ไม่มี transaction — ถ้า checklist/document พังหลังสร้าง contract แล้ว จะได้ข้อมูลไม่ครบ
+- [x] ContractForm submit เป็น 1 request atomic แล้ว (upload ไฟล์ยังแยก — orphan file ถ้าพัง)
 - [ ] `/uploads/<file>` static ยังไม่ต้อง auth
 - [ ] เขียน tests
 
@@ -279,7 +283,7 @@ npm run dev
 ## 10. Gotchas
 
 - มี `main.py` 2 ที่: `backend-eden/main.py` (shim) กับ `backend-eden/app/main.py` (ตัวจริง) — รันด้วย `app.main:app`
-- Alembic migration มีอันเดียว (init) และถูก regenerate ใหม่หลายรอบระหว่าง design — ถ้า DB มี schema เก่าให้ `DROP SCHEMA public CASCADE` แล้ว `alembic upgrade head` ใหม่ (dev เท่านั้น)
+- Alembic migration มี 6 อัน (chain เดียว, head `d1c0nstra1nts`) · init downgrade drop enum type ให้แล้ว (`downgrade base && upgrade head` ได้)
 - `_enum_col()` ใน models.py จำเป็น — ถ้าใช้ `SAEnum(MyEnum)` ตรง ๆ Postgres จะเก็บ *ชื่อ member* (`check_in`) ไม่ใช่ *value* (`check-in`)
 - repo ไม่มี `.gitattributes` → มี warning LF/CRLF เวลา `git add` บน Windows (ไม่กระทบอะไร)
 - `.gitignore` ซ่อน `.env*` ทั้งหมด ยกเว้น `**/.env.example` (negation) — ไฟล์ `.env` จริงไม่เคยเข้า git

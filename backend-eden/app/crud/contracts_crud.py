@@ -1,3 +1,5 @@
+import datetime
+
 from sqlalchemy import and_, exists
 from sqlalchemy.orm import Session
 
@@ -5,7 +7,12 @@ from ..models import models
 from ..schemas import schemas
 
 
-def create_contract(db: Session, contract: schemas.Contracts):
+def create_contract(
+    db: Session,
+    contract: schemas.Contracts,
+    created_by: int | None = None,
+    commit: bool = True,
+):
     new_contract = models.Contracts(
         tenant_id=contract.tenant_id,
         room_id=contract.room_id,
@@ -16,11 +23,14 @@ def create_contract(db: Session, contract: schemas.Contracts):
         contract_file_url=contract.contract_file_url,
         special_conditions=contract.special_conditions,
         status=contract.status,
-        created_by=contract.created_by,
+        created_by=created_by,
     )
     db.add(new_contract)
-    db.commit()
-    db.refresh(new_contract)
+    if commit:
+        db.commit()
+        db.refresh(new_contract)
+    else:
+        db.flush()
     return new_contract
 
 
@@ -79,3 +89,19 @@ def delete_contract(db: Session, contract_id: int):
     db.delete(contract)
     db.commit()
     return contract
+
+
+def expire_overdue(db: Session) -> int:
+    """ตั้งสัญญา active ที่เลย end_date เป็น expired · คืนจำนวนที่เปลี่ยน"""
+    n = (
+        db.query(models.Contracts)
+        .filter(
+            models.Contracts.status == models.ContractStatus.active,
+            models.Contracts.end_date < datetime.date.today(),
+        )
+        .update(
+            {"status": models.ContractStatus.expired}, synchronize_session=False
+        )
+    )
+    db.commit()
+    return n
