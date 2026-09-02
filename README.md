@@ -23,6 +23,15 @@ docker compose up -d --build
 
 backend container จะรัน `alembic upgrade head` ให้อัตโนมัติตอนสตาร์ต
 
+### ตั้งค่า (ไฟล์ `.env` ที่ root — ดู `.env.example`)
+
+| ตัวแปร | ใช้ทำอะไร | default |
+|---|---|---|
+| `POSTGRES_*` / `PGADMIN_*` / `*_PORT` | ค่า Postgres / pgAdmin / พอร์ต host | dev-safe |
+| `VITE_API_BASE` | base URL ที่ browser ใช้เรียก backend — เปลี่ยนตอน deploy ไปโดเมนจริง | `http://localhost:8000` |
+
+> `SECRET_KEY` / `FIELD_ENCRYPTION_KEY` อยู่ที่ `backend-eden/.env` แยกต่างหาก
+
 ## รัน backend แบบ local (ไม่ผ่าน Docker)
 
 ต้องมี postgres รันอยู่ก่อน (`docker compose up -d postgres`)

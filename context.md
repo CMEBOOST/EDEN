@@ -277,7 +277,7 @@ npm run dev
 - [x] `SECRET_KEY` ไม่ถูกฝังใน image · uploads อยู่นอก image · `npm ci` แทน `npm install`
 - [x] pin image เวอร์ชันทุกตัว · healthcheck backend · root `.env` สำหรับ compose (port/password)
 - [x] CI — `.github/workflows/ci.yml` (backend: pyright + alembic upgrade · frontend: eslint + vite build)
-- [ ] ตั้ง `VITE_API_BASE` ตอน build (ตอนนี้ frontend เรียก `http://localhost:8000` ตายตัว)
+- [x] `VITE_API_BASE` ตั้งผ่าน env — `frontend-eden/.env.example` · Dockerfile `ARG`+`ENV` · compose `frontend.build.args` + `environment` (ค่าจาก `${VITE_API_BASE}` ที่ root `.env`) · `lib/api.js` อ่านอยู่แล้ว · default `http://localhost:8000`
 - [ ] production Dockerfile (ตอนนี้ dev mode: `uvicorn --reload`, `npm run dev`) — frontend build → nginx, backend `--workers`, migration แยกเป็น one-shot
 - [ ] backup Postgres (pg_dump cron) · แยก pgadmin เป็น compose profile
 

@@ -329,4 +329,4 @@
 - **สถานะสัญญาอัตโนมัติ** — มี `POST /contracts/run-expire` แล้ว แต่ยังต้องตั้ง cron เอง (ไม่มี scheduler ในแอป)
 - **Tests** — ยังไม่มี unit/integration test
 - ~~**State management ฝั่ง frontend**~~ — ✅ ใช้ TanStack Query v5 แล้ว (ชั้น hook ต่อ domain ใน `src/data/*`, cache + invalidate อัตโนมัติ, เลิก fetch ใน `useEffect`)
-- **Production build** — ยังเป็น dev mode (`uvicorn --reload`, `npm run dev`), `VITE_API_BASE` ยัง hardcode `http://localhost:8000`
+- **Production build** — ยังเป็น dev mode (`uvicorn --reload`, `npm run dev`) · `VITE_API_BASE` ตั้งผ่าน env ได้แล้ว (default `http://localhost:8000`)
