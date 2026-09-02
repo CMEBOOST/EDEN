@@ -5,7 +5,8 @@ EDEN/
 ├── backend-eden/           FastAPI + SQLAlchemy + Alembic (จัดการ dependency ด้วย uv)
 ├── frontend-eden/          React + Vite + Tailwind
 ├── docs/                   เอกสาร (ERD ฯลฯ)
-├── docker-compose.yml      dev — postgres + pgadmin + backend + frontend (hot reload)
+├── scripts/                backup.sh / restore.sh (pg_dump / pg_restore)
+├── docker-compose.yml      dev — postgres + backend + frontend (hot reload) · pgadmin = profile `tools`
 └── docker-compose.prod.yml prod — nginx (SPA + proxy /api) + backend multi-worker + migration one-shot
 ```
 
@@ -19,10 +20,14 @@ docker compose up -d --build
 |----------|-------------------------|
 | backend  | http://localhost:8000/docs |
 | frontend | http://localhost:5173   |
-| pgadmin  | http://localhost:5050   |
 | postgres | localhost:5433          |
 
 backend container จะรัน `alembic upgrade head` ให้อัตโนมัติตอนสตาร์ต
+
+**pgAdmin** ไม่ start โดยอัตโนมัติ — เปิดเมื่อต้องใช้:
+```bash
+docker compose --profile tools up -d pgadmin   # http://localhost:5050
+```
 
 ### ตั้งค่า (ไฟล์ `.env` ที่ root — ดู `.env.example`)
 
@@ -69,7 +74,24 @@ docker compose -f docker-compose.prod.yml exec backend uv run python create_admi
 - backend รันหลาย worker (`WEB_CONCURRENCY`, default 2)
 - แยก project จาก dev (`name: eden-prod`) → volume `eden-prod_postgres-data` / `eden-prod_uploads-data` คนละชุด
 
-**backup DB:**
+## Backup / Restore DB
+
 ```bash
-docker compose -f docker-compose.prod.yml exec -T postgres pg_dump -U postgres EDEN_DB > backup_$(date +%F).sql
+scripts/backup.sh                             # dev — → backups/eden_<ts>.dump
+scripts/backup.sh -f docker-compose.prod.yml  # prod
+
+scripts/restore.sh backups/eden_<ts>.dump                             # dev  (ถามยืนยัน · หยุด backend ชั่วคราว)
+scripts/restore.sh backups/eden_<ts>.dump -f docker-compose.prod.yml  # prod
+```
+
+- `-Fc` custom format (บีบอัด) · เก็บใน `backups/` (gitignore) · ลบไฟล์เก่ากว่า `BACKUP_KEEP_DAYS` (default 14)
+
+**ตั้งอัตโนมัติ (cron):**
+```bash
+# Linux — crontab -e  (ทุกวัน ตี 3)
+0 3 * * * cd /path/to/EDEN && scripts/backup.sh -f docker-compose.prod.yml >> backups/cron.log 2>&1
+```
+```
+# Windows — Task Scheduler → Action:
+"C:\Program Files\Git\bin\bash.exe" -lc "cd /c/Users/USER/Desktop/EDEN && scripts/backup.sh"
 ```

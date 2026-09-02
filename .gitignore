@@ -80,6 +80,12 @@ backend-eden/uploads/*
 !backend-eden/uploads/.gitkeep
 
 # -----------------------------
+# DB backups (scripts/backup.sh)
+# -----------------------------
+/backups/*
+!/backups/.gitkeep
+
+# -----------------------------
 # Front-end (if used inside Front-End)
 # -----------------------------
 node_modules/

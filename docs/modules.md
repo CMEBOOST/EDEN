@@ -334,7 +334,8 @@
 - **สถานะสัญญาอัตโนมัติ** — มี `POST /contracts/run-expire` แล้ว แต่ยังต้องตั้ง cron เอง (ไม่มี scheduler ในแอป)
 - **Tests** — ยังไม่มี unit/integration test
 - ~~**State management ฝั่ง frontend**~~ — ✅ ใช้ TanStack Query v5 แล้ว (ชั้น hook ต่อ domain ใน `src/data/*`, cache + invalidate อัตโนมัติ, เลิก fetch ใน `useEffect`)
-- ~~**Production build**~~ — ✅ `docker-compose.prod.yml` — frontend build → nginx (SPA fallback + proxy `/api/` ไป backend, single origin) · backend `uvicorn --workers` · migration = service `migrate` one-shot · uploads = named volume · backend/postgres ไม่ expose · seed admin: `... exec backend uv run python create_admin.py` · **ยังไม่ทำ:** TLS/reverse-proxy ชั้นนอก, pg_dump cron, log aggregation
+- ~~**Production build**~~ — ✅ `docker-compose.prod.yml` — frontend build → nginx (SPA fallback + proxy `/api/` ไป backend, single origin) · backend `uvicorn --workers` · migration = service `migrate` one-shot · uploads = named volume · backend/postgres ไม่ expose · seed admin: `... exec backend uv run python create_admin.py` · **ยังไม่ทำ:** TLS/reverse-proxy ชั้นนอก, log aggregation
+- ~~**Backup / pgadmin**~~ — ✅ `scripts/backup.sh` / `scripts/restore.sh` (pg_dump `-Fc` + rotation, cron ตัวอย่างใน README) · pgadmin → compose profile `tools`
 
 ---
 

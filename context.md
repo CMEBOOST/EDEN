@@ -28,7 +28,7 @@ core เสร็จแล้ว — auth/RBAC, audit log, สร้างสั
 | DB | PostgreSQL 16 |
 | Auth/hash | bcrypt (pre-hash SHA-256) |
 | Frontend | React 19, Vite, React Router 7, Tailwind CSS 4 |
-| Infra | Docker Compose (postgres, pgadmin, backend, frontend) |
+| Infra | Docker Compose (dev + `docker-compose.prod.yml`) — postgres, backend, frontend · pgadmin = profile `tools` |
 
 ---
 
@@ -84,7 +84,9 @@ EDEN/
 │   └── package.json / vite.config.js
 │
 ├── docs/database_erd.drawio   # ERD (เปิดด้วย diagrams.net / Draw.io extension)
-├── docker-compose.yml        # dev (hot reload)
+├── scripts/                   # backup.sh / restore.sh (pg_dump -Fc / pg_restore)
+├── backups/                   # ไฟล์ .dump (gitignore ยกเว้น .gitkeep)
+├── docker-compose.yml        # dev (hot reload) · pgadmin = profile tools
 ├── docker-compose.prod.yml   # prod (nginx + multi-worker + migrate one-shot)
 ├── .env.example / .env.prod.example
 ├── README.md
@@ -189,11 +191,12 @@ docker compose up -d --build
 |---|---|
 | backend | http://localhost:8000/docs |
 | frontend | http://localhost:5173 |
-| pgadmin | http://localhost:5050 (admin@example.com / admin123) |
 | postgres | localhost:5433 (postgres / admin123 / EDEN_DB) |
+| pgadmin | http://localhost:5050 — **ต้อง `docker compose --profile tools up -d pgadmin`** (admin@example.com / admin123) |
 
 backend container รัน `alembic upgrade head` อัตโนมัติตอนสตาร์ต
 **ล็อกอินครั้งแรก:** `admin` / `admin123` (มีอยู่แล้วใน dev DB) — หรือสร้างใหม่ `cd backend-eden && uv run python create_admin.py <user> <pass>`
+**Backup:** `scripts/backup.sh [-f docker-compose.prod.yml]` → `backups/eden_<ts>.dump` (`-Fc`, rotate `BACKUP_KEEP_DAYS`) · กู้คืน `scripts/restore.sh <file>`
 
 ### Local — backend
 ```bash
@@ -286,7 +289,7 @@ npm run dev
 - [x] CI — `.github/workflows/ci.yml` (backend: pyright + alembic upgrade · frontend: eslint + vite build)
 - [x] `VITE_API_BASE` ตั้งผ่าน env — `frontend-eden/.env.example` · Dockerfile `ARG`+`ENV` · compose `frontend.build.args` + `environment` (ค่าจาก `${VITE_API_BASE}` ที่ root `.env`) · `lib/api.js` อ่านอยู่แล้ว · default `http://localhost:8000`
 - [x] production stack — `docker-compose.prod.yml` + `frontend-eden/Dockerfile` multi-stage (`dev`/`build`/`runtime`) · frontend build → nginx (SPA fallback + proxy `/api/` → backend, single origin) · backend `uvicorn --workers ${WEB_CONCURRENCY}` · migration = service `migrate` one-shot (`service_completed_successfully`) · uploads = named volume · backend/postgres ไม่ expose · `.env.prod.example`
-- [ ] backup Postgres (pg_dump cron) · แยก pgadmin เป็น compose profile
+- [x] backup Postgres — `scripts/backup.sh` / `scripts/restore.sh` (pg_dump `-Fc` / pg_restore ผ่าน `docker compose exec`, rotation, ใช้ dev/prod ด้วย `-f`) · cron ตัวอย่างใน README · pgadmin → compose profile `tools` (ไม่ start อัตโนมัติ)
 
 ---
 
@@ -298,4 +301,6 @@ npm run dev
 - repo ไม่มี `.gitattributes` → มี warning LF/CRLF เวลา `git add` บน Windows (ไม่กระทบอะไร)
 - `.gitignore` ซ่อน `.env*` ทั้งหมด ยกเว้น `**/.env.example` + `**/.env.prod.example` (negation) — ไฟล์ `.env` จริงไม่เคยเข้า git
 - **dev vs prod compose:** `frontend-eden/Dockerfile` เป็น multi-stage · dev compose ต้องระบุ `build.target: dev` (ไม่งั้นได้ stage สุดท้าย = nginx) · prod ใช้ `docker-compose.prod.yml` (`target: runtime`) — คนละ project (`eden-prod`), volume คนละชุด, backend อ่าน secret จาก `backend-eden/.env` เหมือนกัน
+- **pgadmin = profile `tools`** — `docker compose up` ปกติไม่ start · ต้อง `docker compose --profile tools up -d pgadmin`
+- **restore.sh** หยุด `backend`/`migrate` ก่อน `pg_restore --clean` (กัน connection ค้างตอน DROP) แล้ว start `backend` คืน
 - prod: `VITE_API_BASE=/api` (nginx proxy strip prefix ไป `backend:8000`) — ไม่ต้องแตะ CORS · dev: `http://localhost:8000` (เรียกตรง)
