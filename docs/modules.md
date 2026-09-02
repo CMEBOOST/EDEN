@@ -96,7 +96,7 @@
 - Frontend: หน้า `/tenants` (staff+) — ตาราง + เพิ่ม/แก้/ลบ, ฟอร์มผู้เช่า
 
 ยังไม่มี / หมายเหตุ:
-- `national_id_encrypted` ยังเก็บ plaintext (ยังไม่เข้ารหัสจริง) และ `GET /tenants/` ยังคืนค่านี้ออกมา (ยังไม่มี response schema แยก)
+- `national_id_encrypted` เข้ารหัสจริงแล้ว (Fernet ผ่าน `EncryptedStr`, `app/core/crypto.py`) · `GET /tenants/` (`TenantSummary`) ไม่คืนค่านี้ · `GET/POST/PUT /tenants/{id}` (`TenantOut`) คืนค่า decrypt แล้วให้ staff
 - `last_login_at` — อัปเดตตอน tenant ล็อกอิน (`login_route`)
 - `tenants.user_id` มี UNIQUE constraint แล้ว (1 บัญชี ↔ 1 ผู้เช่า)
 
@@ -325,7 +325,7 @@
 
 - **Rooms** — มีตาราง `rooms` แล้ว (demo, seed คงที่) แต่ยังไม่มีหน้าจัดการห้อง / สถานะ "ปิดปรับปรุง"
 - **บิล / ใบแจ้งหนี้ / มิเตอร์น้ำ-ไฟ** — มีแค่ "อัตรา" ยังไม่มีการออกบิล
-- **การเข้ารหัสบัตรประชาชนจริง** — `national_id_encrypted` ยัง plaintext
+- ~~**การเข้ารหัสบัตรประชาชนจริง**~~ — ✅ `national_id_encrypted` เข้ารหัส Fernet at rest แล้ว (`EncryptedStr`, migration `671e1a7f8221`)
 - **สถานะสัญญาอัตโนมัติ** — มี `POST /contracts/run-expire` แล้ว แต่ยังต้องตั้ง cron เอง (ไม่มี scheduler ในแอป)
 - **Tests** — ยังไม่มี unit/integration test
 - ~~**State management ฝั่ง frontend**~~ — ✅ ใช้ TanStack Query v5 แล้ว (ชั้น hook ต่อ domain ใน `src/data/*`, cache + invalidate อัตโนมัติ, เลิก fetch ใน `useEffect`)

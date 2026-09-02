@@ -44,8 +44,9 @@ EDEN/
 │   │   ├── routers/routers.py # ทุก API endpoint (auth_router, router, tenant/contract/rate/... )
 │   │   └── core/
 │   │       ├── security.py    # hash_password / verify_password (bcrypt)
+│   │       ├── crypto.py      # encrypt/decrypt + EncryptedStr (Fernet) — encryption at rest ของ PII
 │   │       ├── auth.py        # JWT: create_access_token, get_current_user, require_roles/require_staff/require_admin
-│   │       └── config.py      # SECRET_KEY ฯลฯ จาก .env
+│   │       └── config.py      # SECRET_KEY / FIELD_ENCRYPTION_KEY ฯลฯ จาก .env
 │   ├── alembic/versions/      # init → unique rate → contract_requests → b33c320591bb (users.avatar_url)
 │   ├── alembic.ini · main.py (shim) · Dockerfile / .dockerignore
 │   ├── create_admin.py        # seed admin คนแรก
@@ -98,13 +99,12 @@ Source of truth = [backend-eden/app/models/models.py](backend-eden/app/models/mo
 | `users` | user_id | username (uq), password_hash, role, is_active, avatar_url | — |
 | `tenants` | tenant_id | full_name, phone, email, national_id_encrypted, last_login_at | user_id → users |
 | `tenant_documents` | doc_id | doc_type, file_url | tenant_id → tenants, uploaded_by → users |
-| `contracts` | contract_id | start/end_date, rent, security_deposit, status, room_id* | tenant_id → tenants, created_by → users |
+| `contracts` | contract_id | start/end_date, rent, security_deposit, status, room_id (nullable) | tenant_id → tenants, created_by → users, room_id → rooms (ON DELETE SET NULL) |
+| `rooms` | room_id (= เลขห้อง) | floor, base_rent · seed 101–110/201–210/301–310/401–410 (demo, ผ่าน migration) · สถานะว่าง/ไม่ว่างคำนวณสดจาก contracts | — |
 | `contract_checklists` | cc_id | type (check-in/out), checklist_items (JSON), photo_urls (JSON), tenant_signature | contract_id → contracts, created_by → users |
 | `contract_requests` | request_id | request_type (renew/terminate), status, tenant_note, preferred_date, staff_note, damage_total, handled_at | contract_id → contracts, created_by / handled_by → users |
 | `rate_configs` | rate_id | type (water/electric), rate_value, effective_date · **UNIQUE(type, effective_date)** | created_by → users |
 | `audit_logs` | log_id | action, created_at | user_id → users |
-
-\* `room_id` ยังเป็น nullable ไม่มี FK — ตาราง `rooms` ยังไม่ทำ (Demo)
 
 **Enums** (เก็บเป็น *value* ใน DB ผ่าน helper `_enum_col`):
 - `role_enum`: admin / staff / tenant
@@ -215,8 +215,9 @@ npm run dev
   - ใน Docker: `docker-compose.yml` ตั้ง `DATABASE_URL=...@postgres:5432/EDEN_DB`
   - `alembic/env.py` ใช้ URL เดียวกันนี้ (override `sqlalchemy.url` ใน `alembic.ini`)
 - **CORS**: `app/main.py` อนุญาตเฉพาะ `http://localhost:5173`
-- **`SECRET_KEY`** (เซ็น JWT) + `ACCESS_TOKEN_EXPIRE_MINUTES` อยู่ใน `backend-eden/.env` (gitignore) — `config.py` โหลดให้ · ดู `.env.example`
+- **`SECRET_KEY`** (เซ็น JWT) + `ACCESS_TOKEN_EXPIRE_MINUTES` + `FIELD_ENCRYPTION_KEY` (optional) อยู่ใน `backend-eden/.env` (gitignore) — `config.py` โหลดให้ · ดู `.env.example`
   - ใน Docker: compose ฉีดเข้าผ่าน `env_file: ./backend-eden/.env` (`required: false`) — ไม่ถูกฝังใน image (`.env` อยู่ใน `.dockerignore`)
+  - `FIELD_ENCRYPTION_KEY` ไม่ตั้ง = crypto อนุมาน key จาก `SECRET_KEY` → **หมุน `SECRET_KEY` โดยไม่ตั้ง `FIELD_ENCRYPTION_KEY` = `national_id` เดิมอ่านไม่ออก** (decrypt คืน `None`)
 - **สร้าง admin คนแรก:** `cd backend-eden && uv run python create_admin.py <user> <pass>` (มี `admin` / `admin123` อยู่แล้วสำหรับ dev)
 - DB password / พอร์ต ปรับผ่าน `.env` ที่ root (`POSTGRES_PASSWORD`, `*_PORT` ฯลฯ) — มี default `admin123` สำหรับ dev
 - data volume: **named volumes** `eden_postgres-data`, `eden_pgadmin-data` (Docker จัดการเอง)
@@ -234,6 +235,7 @@ npm run dev
 - schema changes → แก้ `models.py` แล้ว `uv run alembic revision --autogenerate -m "..."` → `alembic upgrade head`
 - **เวลา**: DB เก็บ `timestamptz` เต็ม ๆ (UTC) — จัดรูปแบบตอนแสดงผลที่ frontend (`utils/datetime.js`, timezone Asia/Bangkok)
 - password: `hash_password()` / `verify_password()` จาก `app/core/security.py` เท่านั้น อย่าเก็บ plaintext
+- `tenants.national_id_encrypted`: column type = `EncryptedStr` (`app/core/crypto.py`) — encrypt/decrypt เองอัตโนมัติ · เขียน/อ่านเป็น plaintext ปกติผ่าน ORM · ค่าใน DB เป็น Fernet token
 - **rate_configs = effective-dated history**: แต่ละแถว = "ตั้งแต่ `effective_date` เรทคือ X" · หลายแถวต่อ type = ประวัติ (ปกติ) · แถวใหม่ปิดแถวเก่าเอง ไม่มี `end_date` · อัตราปัจจุบัน = `effective_date` ล่าสุดที่ ≤ วันนี้ (ใช้ `GET /rates/current` หรือ `rate_crud.get_effective_rate`)
 - git: commit ท้ายข้อความใส่ `Co-Authored-By: Claude ...` เมื่อใช้ AI ช่วย
 
@@ -252,8 +254,8 @@ npm run dev
 - [x] สร้างสัญญา atomic — `POST /contracts/` รับ checklist check-in + เอกสาร ในทรานแซกชันเดียว
 - [x] `POST /contracts/run-expire` (admin) — ตั้ง active ที่เลย end_date เป็น expired (เอาไป cron)
 - [x] response schema แยกสำหรับ tenants — `TenantSummary` (list, ไม่มี national_id/last_login_at/updated_at) · `TenantOut` (detail `GET/POST/PUT /tenants/{id}`, staff เห็น national_id ได้) · `/dashboard/` มุมมองผู้เช่าใช้ `_tenant_public`
-- [ ] ตาราง `rooms` + ผูก FK `contracts.room_id`
-- [ ] เข้ารหัส `national_id_encrypted` จริง (ตอนนี้เป็นแค่ชื่อคอลัมน์)
+- [x] ตาราง `rooms` + FK `contracts.room_id → rooms` (ON DELETE SET NULL) — migration `c4f2a9b17d30` (สร้างตาราง + seed 40 ห้อง + ล้าง room_id เก่าที่ไม่ตรง) · `Room` model, `/rooms/?available=`, `RoomOut`
+- [x] เข้ารหัส `national_id_encrypted` จริง — Fernet ผ่าน `EncryptedStr` TypeDecorator (`app/core/crypto.py`, โปร่งใสต่อ CRUD/schema) · key จาก env `FIELD_ENCRYPTION_KEY` (ไม่ตั้ง = อนุมานจาก `SECRET_KEY`) · migration `671e1a7f8221` เข้ารหัสข้อมูลเดิม (idempotent + reversible) · dep `cryptography`
 - [x] ContractForm submit เป็น 1 request atomic แล้ว (upload ไฟล์ยังแยก — orphan file ถ้าพัง)
 - [ ] `/uploads/<file>` static ยังไม่ต้อง auth
 - [ ] เขียน tests
@@ -284,7 +286,7 @@ npm run dev
 ## 10. Gotchas
 
 - มี `main.py` 2 ที่: `backend-eden/main.py` (shim) กับ `backend-eden/app/main.py` (ตัวจริง) — รันด้วย `app.main:app`
-- Alembic migration มี 6 อัน (chain เดียว, head `d1c0nstra1nts`) · init downgrade drop enum type ให้แล้ว (`downgrade base && upgrade head` ได้)
+- Alembic migration มี 7 อัน (chain เดียว, head `671e1a7f8221` = encrypt national_id) · init downgrade drop enum type ให้แล้ว (`downgrade base && upgrade head` ได้)
 - `_enum_col()` ใน models.py จำเป็น — ถ้าใช้ `SAEnum(MyEnum)` ตรง ๆ Postgres จะเก็บ *ชื่อ member* (`check_in`) ไม่ใช่ *value* (`check-in`)
 - repo ไม่มี `.gitattributes` → มี warning LF/CRLF เวลา `git add` บน Windows (ไม่กระทบอะไร)
 - `.gitignore` ซ่อน `.env*` ทั้งหมด ยกเว้น `**/.env.example` (negation) — ไฟล์ `.env` จริงไม่เคยเข้า git

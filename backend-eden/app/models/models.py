@@ -19,6 +19,7 @@ from sqlalchemy import (
     text,
 )
 
+from ..core.crypto import EncryptedStr
 from ..database import Base
 
 # เก็บเวลาเต็ม (UTC + timezone) — การจัดรูปแบบให้อ่านง่ายทำที่ฝั่งแสดงผล
@@ -127,7 +128,7 @@ class Tenants(TimestampMixin, Base):
     phone: Mapped[str] = mapped_column(String(20))
     email: Mapped[str] = mapped_column(String(255))
     current_address: Mapped[str | None] = mapped_column(Text)
-    national_id_encrypted: Mapped[str | None] = mapped_column(String(255))
+    national_id_encrypted: Mapped[str | None] = mapped_column(EncryptedStr(255))
     emergency_contact: Mapped[str | None] = mapped_column(String(255))
     last_login_at: Mapped[datetime.datetime | None] = mapped_column(Timestamp)
 
