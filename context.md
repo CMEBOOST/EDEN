@@ -36,7 +36,7 @@
 EDEN/
 ├── backend-eden/              # FastAPI backend (แยกออกมาเป็นเอกเทศ)
 │   ├── app/
-│   │   ├── main.py            # FastAPI app + CORS + mount /uploads + include routers
+│   │   ├── main.py            # FastAPI app + CORS + route /uploads (authed) + include routers
 │   │   ├── database.py        # engine / SessionLocal / get_db / Base (โหลด .env)
 │   │   ├── models/models.py   # ORM models ทั้งหมด (source of truth ของ schema)
 │   │   ├── schemas/schemas.py # Pydantic schemas
@@ -136,7 +136,7 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | PATCH | `/users/{id}/role` | เปลี่ยน role (admin) — เปลี่ยนของตัวเองไม่ได้ (400) · เปลี่ยนได้เฉพาะ admin ↔ staff (บัญชี tenant ล็อก role, 400) |
 | PATCH | `/users/{id}/password` | admin ตั้งรหัสผ่านใหม่ให้โดยตรง (`{new_password}` ≥6 ตัว) |
 | POST | `/upload/` | อัปโหลดไฟล์ 1 ไฟล์ (multipart `file`) → `{url, filename}` · จำกัด jpg/png/webp/gif/pdf ≤ 10MB |
-| GET | `/uploads/<name>` | เสิร์ฟไฟล์ที่อัปโหลด (StaticFiles จาก `backend-eden/uploads/`) |
+| GET | `/uploads/<name>` | เสิร์ฟไฟล์อัปโหลด (`backend-eden/uploads/`) — **ต้องล็อกอิน** (token ทาง header หรือ `?token=`) |
 | POST/GET | `/tenants/` | สร้าง / list · create: user ต้อง role=tenant (400), ยังไม่ผูก tenant อื่น (409) |
 | GET/PUT/DELETE | `/tenants/{id}` | อ่าน / แก้ (`TenantUpdate`) / ลบ |
 | POST/GET | `/tenants/{id}/documents` | เอกสารของผู้เช่า (`{doc_type, file_url, uploaded_by?}`) |
@@ -160,11 +160,11 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 - **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/profile/*` (แก้ของตัวเอง), `/rates/current`, `/contract-requests/` (POST + GET + DELETE เฉพาะของตัวเอง; ยกเลิกได้เฉพาะ status=pending) — เข้า `/tenants` `/contracts` `/rates` list → 403
 - **ต่อสัญญา** = `PUT /contracts/{id}` `{end_date}` (staff+) · **ตรวจสภาพห้องออก** = `POST .../checklists` `{type:check-out}` (staff+) · ตั้ง `terminated` = admin เท่านั้น (staff ตรวจได้ แต่ยุติไม่ได้)
 - `DELETE /tenants/{id}` = **soft delete** (ปิด `is_active` ของ user ที่ผูก, ข้อมูลไม่หาย)
-- `/uploads/<file>` (static) ยังเปิดอ่านได้ไม่ต้อง token (dev)
+- `/uploads/<file>` ต้องล็อกอิน (`get_user_for_file` — รับ token ทาง `Authorization` header หรือ `?token=`) · `fileUrl()` ฝั่ง frontend ต่อ `?token=` ให้อัตโนมัติ · ยังไม่เช็ค per-file ownership
 
 **Audit log:** `AuditMiddleware` ([app/core/audit.py](backend-eden/app/core/audit.py)) บันทึกทุก request ที่ method เป็น POST/PUT/PATCH/DELETE + สำเร็จ (2xx) ลง `audit_logs` โดย decode token เอาว่าใครทำ + `describe()` แปลง method+path เป็นข้อความไทย · login บันทึกแยกใน route
 
-> `/tenants/` ยังคืน `national_id_encrypted` (ยังไม่มี response schema แยก) · `created_by`/`uploaded_by`/`last_login_at` เซ็ตจาก current user แล้ว
+> `/tenants/` list = `TenantSummary` (ไม่มี `national_id`) · detail `/tenants/{id}` = `TenantOut` (มี, decrypt แล้ว) · `national_id_encrypted` เข้ารหัส Fernet at rest · `created_by`/`uploaded_by`/`last_login_at` เซ็ตจาก current user แล้ว
 
 ---
 
@@ -257,7 +257,7 @@ npm run dev
 - [x] ตาราง `rooms` + FK `contracts.room_id → rooms` (ON DELETE SET NULL) — migration `c4f2a9b17d30` (สร้างตาราง + seed 40 ห้อง + ล้าง room_id เก่าที่ไม่ตรง) · `Room` model, `/rooms/?available=`, `RoomOut`
 - [x] เข้ารหัส `national_id_encrypted` จริง — Fernet ผ่าน `EncryptedStr` TypeDecorator (`app/core/crypto.py`, โปร่งใสต่อ CRUD/schema) · key จาก env `FIELD_ENCRYPTION_KEY` (ไม่ตั้ง = อนุมานจาก `SECRET_KEY`) · migration `671e1a7f8221` เข้ารหัสข้อมูลเดิม (idempotent + reversible) · dep `cryptography`
 - [x] ContractForm submit เป็น 1 request atomic แล้ว (upload ไฟล์ยังแยก — orphan file ถ้าพัง)
-- [ ] `/uploads/<file>` static ยังไม่ต้อง auth
+- [x] `/uploads/<file>` ต้องล็อกอินก่อน — route `GET /uploads/{name:path}` (`get_user_for_file`) แทน `StaticFiles` mount · `<img>`/`<a>` แนบ header ไม่ได้ → `fileUrl()` ต่อ `?token=<JWT>` · guard path traversal + `Referrer-Policy: no-referrer` · **ยังไม่มี per-file ownership** (ผู้ล็อกอินใด ๆ + รู้ชื่อไฟล์ = โหลดได้ · ชื่อเป็น uuid4)
 - [ ] เขียน tests
 
 **Frontend**

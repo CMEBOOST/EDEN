@@ -2,7 +2,7 @@
 import datetime
 
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Query, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 
@@ -12,6 +12,8 @@ from ..models import models
 from .config import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, SECRET_KEY
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
+# แบบไม่บังคับ — ใช้กับ route เสิร์ฟไฟล์ (token อาจมาทาง query แทน)
+oauth2_optional = OAuth2PasswordBearer(tokenUrl="auth/login", auto_error=False)
 
 _credentials_exc = HTTPException(
     status_code=status.HTTP_401_UNAUTHORIZED,
@@ -40,13 +42,11 @@ def create_access_token(username: str) -> str:
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
 
 
-def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-) -> models.Users:
+def _user_from_token(raw: str | None, db: Session) -> models.Users:
+    if not raw:
+        raise _credentials_exc
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
+        username = jwt.decode(raw, SECRET_KEY, algorithms=[ALGORITHM]).get("sub")
     except jwt.PyJWTError:
         raise _credentials_exc
     if not username:
@@ -58,6 +58,22 @@ def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="บัญชีนี้ถูกปิดการใช้งาน")
     return user
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme),
+    db: Session = Depends(get_db),
+) -> models.Users:
+    return _user_from_token(token, db)
+
+
+def get_user_for_file(
+    token: str | None = Query(default=None),
+    header: str | None = Depends(oauth2_optional),
+    db: Session = Depends(get_db),
+) -> models.Users:
+    """auth สำหรับ route เสิร์ฟไฟล์ — <img>/<a> แนบ header ไม่ได้ จึงรับ token ทาง ?token= ด้วย"""
+    return _user_from_token(token or header, db)
 
 
 def require_roles(*roles: str):

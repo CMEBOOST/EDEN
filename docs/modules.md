@@ -23,7 +23,7 @@
 | 9 | Rates (อัตราค่าน้ำ-ไฟ) | `/rates/*` | `modules/rates/` | admin (list = staff+, current = ทุกคน) |
 | 10 | Dashboard | `/dashboard/` | `modules/dashboard/` | ทุก role (ข้อมูลต่างกัน) |
 | 11 | Audit Log | `/audit-logs/` | `modules/audit/` | admin |
-| 12 | Uploads (ไฟล์) | `/upload/`, `/uploads/<name>` | `components/FileDropField.jsx` | staff+ (อ่าน = เปิด) |
+| 12 | Uploads (ไฟล์) | `/upload/`, `/uploads/<name>` | `components/FileDropField.jsx` | อัป = staff+ · อ่าน = ต้องล็อกอิน |
 | — | Core (auth/security/audit/storage/config) | `app/core/` | `lib/`, `auth/` | — |
 
 > **Role:** `admin` = ผู้ดูแลระบบ · `staff` = เจ้าหน้าที่หอพัก · `tenant` = ผู้เช่า
@@ -267,16 +267,16 @@
 
 ## 12. Uploads — ไฟล์แนบ
 
-**Backend:** `app/core/storage.py`, `routers.py` (`upload_router`), static mount ใน `app/main.py`
-**Frontend:** `src/components/FileDropField.jsx`, `src/lib/api.js` (`apiUpload`)
+**Backend:** `app/core/storage.py`, `routers.py` (`upload_router`), route `serve_upload` + `get_user_for_file` (`app/core/auth.py`) ใน `app/main.py`
+**Frontend:** `src/components/FileDropField.jsx`, `src/lib/api.js` (`apiUpload`, `fileUrl`)
 
 ทำได้ตอนนี้:
 - `POST /upload/` (staff+) — อัปโหลดไฟล์ 1 ไฟล์ (multipart `file`) → `{url, filename}`
   - รองรับ `.jpg .jpeg .png .webp .gif .pdf` · ≤ 10 MB · ตั้งชื่อใหม่เป็น UUID
-- `GET /uploads/<name>` — เสิร์ฟไฟล์จาก `backend-eden/uploads/` (StaticFiles)
+- `GET /uploads/<name>` — **ต้องล็อกอิน** · token ทาง `Authorization` header หรือ `?token=<JWT>` (`<img>`/`<a>` แนบ header ไม่ได้ → `fileUrl()` ต่อ `?token=` ให้) · guard path traversal
 - เก็บบนดิสก์ผ่าน bind mount `./backend-eden/uploads` (เห็นบน host)
 
-ยังไม่มี / หมายเหตุ: `/uploads/<file>` static ยัง**เปิดอ่านได้โดยไม่ต้อง token** (dev) · ยังไม่มีการลบไฟล์กำพร้า · prod ควรย้ายไป object storage / named volume
+ยังไม่มี / หมายเหตุ: ยังไม่เช็ค **per-file ownership** (ผู้ล็อกอินใด ๆ ที่รู้ชื่อไฟล์ = โหลดได้ · ชื่อเป็น uuid4) · token อยู่ใน URL (browser history / server log) — tradeoff ที่ยอมรับสำหรับ dev · ยังไม่มีการลบไฟล์กำพร้า · prod ควรย้ายไป object storage / named volume
 
 ---
 

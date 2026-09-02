@@ -13,7 +13,7 @@ MAX_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 def save_upload(file: UploadFile) -> str:
-    """เซฟไฟล์ คืน path สำหรับเข้าถึงผ่าน static mount เช่น '/uploads/<name>'"""
+    """เซฟไฟล์ คืน path เข้าถึงผ่าน route `GET /uploads/<name>` (ต้องล็อกอิน) เช่น '/uploads/<name>'"""
     ext = Path(file.filename or "").suffix.lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(

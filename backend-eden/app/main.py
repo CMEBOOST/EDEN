@@ -1,10 +1,10 @@
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.exc import IntegrityError
 
 from .core.audit import AuditMiddleware
+from .core.auth import get_user_for_file
 from .core.errors import ErrorHandlerMiddleware
 from .core.storage import UPLOAD_DIR
 from .routers import routers
@@ -43,8 +43,14 @@ async def _integrity_error(request: Request, exc: IntegrityError):
     )
 
 
-# เสิร์ฟไฟล์อัปโหลด (รูป checklist / เอกสาร) ที่ /uploads
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# เสิร์ฟไฟล์อัปโหลด (รูป checklist / เอกสาร / avatar) — ต้องล็อกอินก่อน
+# <img>/<a> แนบ Authorization header ไม่ได้ → get_user_for_file รับ token ทาง ?token= ด้วย
+@app.get("/uploads/{name:path}", include_in_schema=False)
+def serve_upload(name: str, _=Depends(get_user_for_file)):
+    path = (UPLOAD_DIR / name).resolve()
+    if not path.is_relative_to(UPLOAD_DIR.resolve()) or not path.is_file():
+        raise HTTPException(status_code=404, detail="ไม่พบไฟล์")
+    return FileResponse(path, headers={"Referrer-Policy": "no-referrer"})
 
 app.include_router(routers.auth_router)
 app.include_router(routers.router)

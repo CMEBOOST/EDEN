@@ -62,6 +62,12 @@ export const apiUpload = (file, path = "/upload/") => {
   return request(path, { method: "POST", body: fd });
 };
 
-// รวม base URL ให้ path ที่ backend คืนมา (เช่น "/uploads/x.png") -> ใช้กับ <img src>
-export const fileUrl = (path) =>
-  path?.startsWith("http") ? path : `${API_BASE}${path ?? ""}`;
+// รวม base URL ให้ path ที่ backend คืนมา (เช่น "/uploads/x.png") -> ใช้กับ <img src> / <a href>
+// /uploads ต้อง auth — <img>/<a> แนบ header ไม่ได้ จึงต่อ token ทาง ?token=
+export const fileUrl = (path) => {
+  if (!path) return "";
+  if (path.startsWith("http")) return path;
+  const token = getToken();
+  const sep = path.includes("?") ? "&" : "?";
+  return `${API_BASE}${path}${token ? `${sep}token=${encodeURIComponent(token)}` : ""}`;
+};
