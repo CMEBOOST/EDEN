@@ -251,7 +251,7 @@ npm run dev
 - [x] DB constraint: `tenants.user_id` unique · 1 ห้อง–1 สัญญา active · CHECK วันที่/ค่าเงิน ≥ 0 · IntegrityError → 409
 - [x] สร้างสัญญา atomic — `POST /contracts/` รับ checklist check-in + เอกสาร ในทรานแซกชันเดียว
 - [x] `POST /contracts/run-expire` (admin) — ตั้ง active ที่เลย end_date เป็น expired (เอาไป cron)
-- [ ] response schema แยกสำหรับ tenants (`/tenants/` ยังคืน `national_id_encrypted`)
+- [x] response schema แยกสำหรับ tenants — `TenantSummary` (list, ไม่มี national_id/last_login_at/updated_at) · `TenantOut` (detail `GET/POST/PUT /tenants/{id}`, staff เห็น national_id ได้) · `/dashboard/` มุมมองผู้เช่าใช้ `_tenant_public`
 - [ ] ตาราง `rooms` + ผูก FK `contracts.room_id`
 - [ ] เข้ารหัส `national_id_encrypted` จริง (ตอนนี้เป็นแค่ชื่อคอลัมน์)
 - [x] ContractForm submit เป็น 1 request atomic แล้ว (upload ไฟล์ยังแยก — orphan file ถ้าพัง)

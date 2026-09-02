@@ -81,6 +81,25 @@ class TenantUpdate(BaseModel):
     emergency_contact: str | None = None
 
 
+class TenantSummary(BaseModel):
+    """response สำหรับ list — ไม่มี national_id / field ภายใน"""
+    tenant_id: int
+    user_id: int
+    full_name: str
+    phone: str
+    email: str
+    current_address: str | None = None
+    emergency_contact: str | None = None
+    created_at: datetime.datetime
+
+    model_config = {"from_attributes": True}
+
+
+class TenantOut(TenantSummary):
+    """response สำหรับ detail — staff เห็น national_id ของผู้เช่ารายเดียวได้"""
+    national_id_encrypted: str | None = None
+
+
 class ProfileTenantUpdate(BaseModel):
     """แก้ข้อมูลติดต่อของตัวเอง (ผู้เช่า) — ไม่มี field sensitive"""
     full_name: str | None = None

@@ -184,7 +184,7 @@ def upload_file_route(file: UploadFile = File(...)):
 tenant_router = APIRouter(prefix="/tenants", tags=["Tenants"], dependencies=_staff)
 
 
-@tenant_router.post("/", dependencies=_staff)
+@tenant_router.post("/", response_model=schemas.TenantOut, dependencies=_staff)
 def create_tenant_route(tenant: schemas.Tenants, db: Session = Depends(get_db)):
     user = user_crud.get_user_by_id(db=db, user_id=tenant.user_id)
     if user is None:
@@ -207,12 +207,12 @@ def create_tenant_route(tenant: schemas.Tenants, db: Session = Depends(get_db)):
         )
 
 
-@tenant_router.get("/")
+@tenant_router.get("/", response_model=list[schemas.TenantSummary])
 def list_tenants_route(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return tenent_crud.get_tenants(db=db, skip=skip, limit=limit)
 
 
-@tenant_router.get("/{tenant_id}")
+@tenant_router.get("/{tenant_id}", response_model=schemas.TenantOut)
 def get_tenant_route(tenant_id: int, db: Session = Depends(get_db)):
     tenant = tenent_crud.get_tenant(db=db, tenant_id=tenant_id)
     if tenant is None:
@@ -220,7 +220,7 @@ def get_tenant_route(tenant_id: int, db: Session = Depends(get_db)):
     return tenant
 
 
-@tenant_router.put("/{tenant_id}", dependencies=_staff)
+@tenant_router.put("/{tenant_id}", response_model=schemas.TenantOut, dependencies=_staff)
 def update_tenant_route(
     tenant_id: int, data: schemas.TenantUpdate, db: Session = Depends(get_db)
 ):
@@ -818,7 +818,7 @@ def dashboard_route(
         today = datetime.date.today()
         return {
             "role": "tenant",
-            "tenant": home["tenant"],
+            "tenant": _tenant_public(home["tenant"]) if home["tenant"] else None,
             "contract": home["contract"],
             "documents": home["documents"],
             "request": home["request"],
