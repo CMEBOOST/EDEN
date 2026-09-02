@@ -91,6 +91,10 @@ def get_user_route(user_id: int, db: Session = Depends(get_db)):
     return user
 
 
+# เปลี่ยนสิทธิ์ได้เฉพาะระหว่าง admin ↔ staff (บัญชี tenant ล็อก role ไว้)
+_SWITCHABLE_ROLES = {models.Role.admin, models.Role.staff}
+
+
 @router.patch("/{user_id}/role", response_model=schemas.UserOut)
 def update_role_route(
     user_id: int,
@@ -100,9 +104,15 @@ def update_role_route(
 ):
     if user_id == me.user_id:
         raise HTTPException(status_code=400, detail="เปลี่ยน role ของตัวเองไม่ได้")
-    user = user_crud.set_role(db, user_id, data.role)
-    if user is None:
+    target = user_crud.get_user_by_id(db, user_id)
+    if target is None:
         raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
+    if target.role not in _SWITCHABLE_ROLES or data.role not in _SWITCHABLE_ROLES:
+        raise HTTPException(
+            status_code=400,
+            detail="เปลี่ยนสิทธิ์ได้เฉพาะระหว่าง ผู้ดูแลระบบ ↔ พนักงาน (บัญชีผู้เช่าเปลี่ยนสิทธิ์ไม่ได้)",
+        )
+    user = user_crud.set_role(db, user_id, data.role)
     return user
 
 

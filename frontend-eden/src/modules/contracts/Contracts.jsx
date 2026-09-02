@@ -93,7 +93,7 @@ function Contracts() {
   }, [contracts, tenantsById, search]);
 
   return (
-    <div className="p-2 flex flex-col gap-2 font-sans">
+    <div className="p-2 flex flex-col gap-3 font-sans">
       <div className="flex justify-between">
         <div>
           <h2 className="text-3xl">สัญญาเช่า</h2>
@@ -101,16 +101,16 @@ function Contracts() {
             ห้องเช่าทั้งหมด {!loading && `(${contracts.length})`}
           </p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center h-fit">
           <button
             onClick={() => navigate("/contracts/history")}
-            className="px-2.5 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
+            className="px-3 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
           >
             ประวัติสัญญาเช่า
           </button>
           <button
             onClick={() => navigate("/contracts/new")}
-            className="px-2.5 py-2 text-sm bg-blue-500 rounded text-gray-100 hover:bg-blue-600"
+            className="px-3 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
           >
             เพิ่มสัญญา
           </button>
@@ -128,14 +128,6 @@ function Contracts() {
           onChange={(e) => setSearch(e.target.value)}
           className="bg-transparent outline-none w-full"
         />
-      </div>
-
-      <div>
-        <ul className="flex gap-3">
-          <li className="p-2 bg-gray-50 rounded hover:bg-gray-100">ทั้งหมด</li>
-          <li className="p-2 bg-gray-50 rounded hover:bg-gray-100">ค่าเช่า</li>
-          <li className="p-2 bg-gray-50 rounded hover:bg-gray-100">สถานะ</li>
-        </ul>
       </div>
 
       {/* ตาราง */}
@@ -172,7 +164,7 @@ function Contracts() {
             {!loading && !error && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
-                  ไม่มีข้อมูลสัญญา
+                  ยังไม่มีสัญญา
                 </td>
               </tr>
             )}

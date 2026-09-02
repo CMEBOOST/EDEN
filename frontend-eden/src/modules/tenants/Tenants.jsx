@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { apiGet, apiDelete } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
@@ -6,15 +7,15 @@ import TenantForm from "./TenantForm";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
 function Tenants() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
-  const [showForm, setShowForm] = useState(false); // เพิ่มใหม่
-  const [editing, setEditing] = useState(null); // ผู้เช่าที่กำลังแก้ไข
-  const [deleting, setDeleting] = useState(null); // ผู้เช่าที่กำลังจะลบ
+  const [showForm, setShowForm] = useState(false);
+  const [deleting, setDeleting] = useState(null); // ผู้เช่าที่กำลังจะปิดใช้งาน
   const [deleteBusy, setDeleteBusy] = useState(false);
 
   function upsertTenant(saved) {
@@ -35,7 +36,7 @@ function Tenants() {
       );
       setDeleting(null);
     } catch (e) {
-      alert(`ลบไม่สำเร็จ: ${e.message}`);
+      alert(`ปิดใช้งานไม่สำเร็จ: ${e.message}`);
     } finally {
       setDeleteBusy(false);
     }
@@ -75,7 +76,7 @@ function Tenants() {
   }, [tenants, search]);
 
   return (
-    <div className="p-2 flex flex-col gap-2 font-sans">
+    <div className="p-2 flex flex-col gap-3 font-sans">
       <div className="flex justify-between">
         <div>
           <h2 className="text-3xl">ผู้เช่า</h2>
@@ -83,23 +84,18 @@ function Tenants() {
             ผู้เช่าทั้งหมด {!loading && `(${tenants.length})`}
           </p>
         </div>
-        <div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-3 py-2 bg-blue-500 rounded text-gray-100 hover:bg-blue-600"
-          >
-            เพิ่มผู้เช่า
-          </button>
-        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="px-3 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 h-fit"
+        >
+          เพิ่มผู้เช่า
+        </button>
       </div>
 
-      {(showForm || editing) && (
+      {showForm && (
         <TenantForm
-          tenant={editing}
-          onClose={() => {
-            setShowForm(false);
-            setEditing(null);
-          }}
+          tenant={null}
+          onClose={() => setShowForm(false)}
           onSaved={upsertTenant}
         />
       )}
@@ -161,7 +157,7 @@ function Tenants() {
             {!loading && !error && filtered.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-gray-400">
-                  ไม่มีข้อมูลผู้เช่า
+                  ยังไม่มีผู้เช่า
                 </td>
               </tr>
             )}
@@ -171,7 +167,8 @@ function Tenants() {
               filtered.map((t) => (
                 <tr
                   key={t.tenant_id}
-                  className="bg-white hover:bg-gray-50 transition-colors"
+                  onClick={() => navigate(`/tenants/${t.tenant_id}`)}
+                  className="bg-white hover:bg-gray-50 transition-colors cursor-pointer"
                 >
                   <td className="px-4 py-3 font-medium text-gray-900">
                     {t.full_name}
@@ -190,14 +187,20 @@ function Tenants() {
                   <td className="px-4 py-3 text-center">
                     <div className="flex justify-center gap-2">
                       <button
-                        onClick={() => setEditing(t)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/tenants/${t.tenant_id}`);
+                        }}
                         className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
                       >
-                        แก้ไข
+                        รายละเอียด
                       </button>
                       {isAdmin && (
                         <button
-                          onClick={() => setDeleting(t)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleting(t);
+                          }}
                           className="px-2 py-1 text-xs rounded text-red-600 hover:bg-red-50"
                         >
                           ปิดใช้งาน

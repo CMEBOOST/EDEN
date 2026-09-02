@@ -65,21 +65,20 @@ function ContractHistory() {
   }, [contracts, tenantsById, search]);
 
   return (
-    <div className="p-2 flex flex-col gap-2 font-sans">
-      <div className="flex justify-between">
+    <div className="p-2 flex flex-col gap-3 font-sans">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate("/contracts")}
+          className="text-gray-500 hover:text-gray-800"
+        >
+          ← กลับ
+        </button>
         <div>
           <h2 className="text-3xl">ประวัติสัญญาเช่า</h2>
           <p className="text-gray-500">
             สัญญาที่ตรวจคืนห้องแล้ว {!loading && `(${contracts.length})`}
           </p>
-        </div>
-        <div>
-          <button
-            onClick={() => navigate("/contracts")}
-            className="px-3 py-2 rounded border border-gray-300 hover:bg-gray-50"
-          >
-            ← กลับหน้าสัญญาเช่า
-          </button>
         </div>
       </div>
 

@@ -86,14 +86,14 @@ function AuditLog() {
             {error && (
               <tr>
                 <td colSpan={3} className="px-4 py-6 text-center text-red-600">
-                  {error}
+                  โหลดข้อมูลไม่สำเร็จ: {error}
                 </td>
               </tr>
             )}
             {!error && logs.length === 0 && !loading && (
               <tr>
                 <td colSpan={3} className="px-4 py-6 text-center text-gray-400">
-                  ไม่มีบันทึก
+                  ยังไม่มีบันทึก
                 </td>
               </tr>
             )}

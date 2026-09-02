@@ -19,6 +19,7 @@ import ContractHistory from "./modules/contracts/ContractHistory";
 import CheckoutInspection from "./modules/requests/CheckoutInspection";
 import Profile from "./modules/profile/Profile";
 import Tenants from "./modules/tenants/Tenants";
+import TenantDetail from "./modules/tenants/TenantDetail";
 import Rates from "./modules/rates/Rates";
 import Users from "./modules/users/Users";
 import AuditLog from "./modules/audit/AuditLog";
@@ -61,6 +62,14 @@ function App() {
               element={
                 <RequireAuth roles={["admin", "staff"]}>
                   <Tenants />
+                </RequireAuth>
+              }
+            />
+            <Route
+              path="/tenants/:tenantId"
+              element={
+                <RequireAuth roles={["admin", "staff"]}>
+                  <TenantDetail />
                 </RequireAuth>
               }
             />

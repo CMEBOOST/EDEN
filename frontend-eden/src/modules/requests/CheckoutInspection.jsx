@@ -101,7 +101,11 @@ function CheckoutInspection() {
   if (loading)
     return <div className="p-6 text-gray-400 font-sans">กำลังโหลด...</div>;
   if (error && !contract)
-    return <div className="p-6 text-red-600 font-sans">{error}</div>;
+    return (
+      <div className="p-6 text-red-600 font-sans">
+        โหลดข้อมูลไม่สำเร็จ: {error}
+      </div>
+    );
 
   return (
     <div className="flex flex-col gap-5 font-sans max-w-3xl">

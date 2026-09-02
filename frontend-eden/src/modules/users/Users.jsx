@@ -8,8 +8,13 @@ import UserForm from "./UserForm";
 import UserEditModal from "./UserEditModal";
 import PasswordResetDialog from "./PasswordResetDialog";
 
-const ROLE_OPTIONS = [
-  ["tenant", "ผู้เช่า"],
+const ROLE_LABEL = {
+  tenant: "ผู้เช่า",
+  staff: "พนักงาน",
+  admin: "ผู้ดูแลระบบ",
+};
+// เปลี่ยนสิทธิ์ได้เฉพาะระหว่าง admin ↔ staff (บัญชี tenant ล็อก)
+const ROLE_SWITCHABLE = [
   ["staff", "พนักงาน"],
   ["admin", "ผู้ดูแลระบบ"],
 ];
@@ -98,7 +103,7 @@ function Users() {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="px-3 py-2 bg-blue-500 rounded text-gray-100 hover:bg-blue-600 h-fit"
+          className="px-3 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 h-fit"
         >
           เพิ่มผู้ใช้
         </button>
@@ -127,7 +132,15 @@ function Users() {
             {error && !loading && (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-red-600">
-                  {error}
+                  โหลดข้อมูลไม่สำเร็จ: {error}
+                </td>
+              </tr>
+            )}
+
+            {!loading && !error && sorted.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+                  ยังไม่มีผู้ใช้
                 </td>
               </tr>
             )}
@@ -159,20 +172,31 @@ function Users() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <select
-                        value={u.role}
-                        disabled={disabled}
-                        onChange={(e) => changeRole(u, e.target.value)}
-                        className={`border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:text-gray-400 ${
-                          roleStyle[u.role] ?? ""
-                        }`}
-                      >
-                        {ROLE_OPTIONS.map(([v, label]) => (
-                          <option key={v} value={v}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
+                      {u.role === "tenant" ? (
+                        <span
+                          title="บัญชีผู้เช่าเปลี่ยนสิทธิ์ไม่ได้"
+                          className={`inline-block px-2 py-1 rounded text-sm ${
+                            roleStyle.tenant
+                          }`}
+                        >
+                          {ROLE_LABEL.tenant}
+                        </span>
+                      ) : (
+                        <select
+                          value={u.role}
+                          disabled={disabled}
+                          onChange={(e) => changeRole(u, e.target.value)}
+                          className={`border border-gray-300 rounded px-2 py-1 text-sm disabled:bg-gray-100 disabled:text-gray-400 ${
+                            roleStyle[u.role] ?? ""
+                          }`}
+                        >
+                          {ROLE_SWITCHABLE.map(([v, label]) => (
+                            <option key={v} value={v}>
+                              {label}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {tenant ? tenant.full_name : "—"}

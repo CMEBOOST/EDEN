@@ -58,14 +58,15 @@ EDEN/
 │   │   ├── lib/          # api.js (Bearer header, 401→logout, apiGet/Post/Put/Patch/Delete/Upload/Login), auth.js (token), datetime.js, avatar.js (avatarSrc + พรีเซ็ต)
 │   │   ├── auth/         # AuthContext.jsx (useAuth: user/login/logout), RequireAuth.jsx
 │   │   ├── components/   # ConfirmDialog.jsx, FileDropField.jsx, AvatarPicker.jsx (พรีเซ็ต/อัปโหลด/ค่าเริ่มต้น)
-│   │   ├── layout/       # Sidebar.jsx (เมนูตาม role), Topbar.jsx (avatar+ชื่อ+role+logout)
+│   │   ├── layout/       # Sidebar.jsx (เมนูตาม role), Topbar.jsx (breadcrumb + user dropdown), breadcrumbs.js (crumbsFor)
 │   │   ├── pages/        # Login.jsx, About.jsx, Menu.jsx
 │   │   └── modules/
 │   │       ├── dashboard/ Dashboard.jsx (หน้า `/` — แตกตาม role: admin/staff KPI, tenant สัญญาตัวเอง)
 │   │       ├── profile/   Profile.jsx (หน้า /profile — ทุก role: avatar + เปลี่ยนรหัสตัวเอง + ข้อมูลติดต่อ [เฉพาะผู้เช่า])
 │   │       ├── users/     จัดการผู้ใช้ /users (admin) — Users.jsx, UserForm.jsx (เพิ่ม), UserEditModal.jsx (username+avatar), PasswordResetDialog.jsx
 │   │       ├── audit/     AuditLog.jsx (/log — admin, filter user + ค้นหา + โหลดเพิ่ม)
-│   │       ├── tenants/   Tenants.jsx (list+CRUD), TenantForm.jsx
+│   │       ├── tenants/   Tenants.jsx (list — row คลิก→detail), TenantForm.jsx (เพิ่ม), TenantDetail.jsx (/tenants/:id),
+│   │       │              TenantInfoSection.jsx (view/edit), TenantAccountSection.jsx, TenantContractsSection.jsx
 │   │       ├── contracts/ Contracts.jsx (list+แก้/ลบ + <RequestPanel>), ContractForm.jsx (/contracts/new — 3 ส่วน),
 │   │       │              ContractEditForm.jsx, ChecklistEditor.jsx (prop showCost), DocumentUploader.jsx
 │   │       ├── requests/  คำแจ้งความจำนง — IntentNoticeDialog (tenant), RequestPanel/RenewDialog/RejectDialog (staff),
@@ -131,7 +132,7 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 | PATCH | `/profile/tenant` | ผู้เช่าแก้ข้อมูลติดต่อตัวเอง (`full_name/phone/email/current_address/emergency_contact`) — ไม่ผูก tenant → 404 · national_id แก้ไม่ได้ |
 | POST/GET | `/users/` | สร้าง (admin) / list (staff+) — คืน `UserOut` (`user_id, username, role, is_active, avatar_url, created_at`) |
 | GET/PATCH | `/users/{id}` | อ่าน (staff+) / แก้ (admin) `{username?, is_active?, avatar_url?}` — username ชน→409 · แก้ `is_active` ของตัวเองไม่ได้ (400) · `avatar_url` = null / "admin"/"male"/"female" / "/uploads/..." |
-| PATCH | `/users/{id}/role` | เปลี่ยน role (admin) — เปลี่ยนของตัวเองไม่ได้ (400) |
+| PATCH | `/users/{id}/role` | เปลี่ยน role (admin) — เปลี่ยนของตัวเองไม่ได้ (400) · เปลี่ยนได้เฉพาะ admin ↔ staff (บัญชี tenant ล็อก role, 400) |
 | PATCH | `/users/{id}/password` | admin ตั้งรหัสผ่านใหม่ให้โดยตรง (`{new_password}` ≥6 ตัว) |
 | POST | `/upload/` | อัปโหลดไฟล์ 1 ไฟล์ (multipart `file`) → `{url, filename}` · จำกัด jpg/png/webp/gif/pdf ≤ 10MB |
 | GET | `/uploads/<name>` | เสิร์ฟไฟล์ที่อัปโหลด (StaticFiles จาก `backend-eden/uploads/`) |
@@ -260,7 +261,8 @@ npm run dev
 - [x] คำแจ้งความจำนง — tenant กดจาก Dashboard · staff เห็น RequestPanel บน `/contracts` · หน้าตรวจห้องออก `/contracts/:id/checkout`
 - [x] จัดการผู้ใช้ `/users` (เดิม `/permission` → redirect) — แก้ username, avatar (อัปโหลด/พรีเซ็ต), admin ตั้งรหัสผ่านใหม่, คอลัมน์ผู้เช่า
 - [x] Profile `/profile` (เข้าจาก Topbar) — avatar + เปลี่ยนรหัสตัวเอง (UC6.2) + ผู้เช่าแก้ข้อมูลติดต่อตัวเอง (UC2.5, ยกเว้น national_id)
-- [ ] หน้า contract detail (ดู/แก้ checklist + เอกสารของสัญญา)
+- [x] หน้า contract detail `/contracts/:id` (ContractDetail + InfoSection/ChecklistSection/Documents) + ประวัติสัญญา `/contracts/history`
+- [x] หน้า tenant detail `/tenants/:id` (TenantDetail — ข้อมูลผู้เช่า ดู/แก้ + บัญชีผู้ใช้ + สัญญา + เอกสาร) · list row คลิก→detail เหมือน contracts
 - [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)
 
 **Infra**

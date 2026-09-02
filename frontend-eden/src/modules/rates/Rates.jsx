@@ -104,14 +104,12 @@ function Rates() {
           <h2 className="text-3xl">อัตราค่าบริการ</h2>
           <p className="text-gray-500">ประวัติอัตราค่าน้ำ / ค่าไฟ</p>
         </div>
-        <div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-3 py-2 bg-blue-500 rounded text-gray-100 hover:bg-blue-600"
-          >
-            เพิ่มอัตรา
-          </button>
-        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="px-3 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 h-fit"
+        >
+          เพิ่มอัตรา
+        </button>
       </div>
 
       {/* การ์ดสรุปอัตราปัจจุบัน */}
