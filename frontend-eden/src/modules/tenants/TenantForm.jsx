@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPut } from "../../lib/api";
+import { useEffect, useMemo, useState } from "react";
+import { useTenants, useCreateTenant, useUpdateTenant } from "../../data/tenants";
+import { useUsers } from "../../data/users";
 
 const EMPTY = {
   user_id: "",
@@ -27,8 +28,10 @@ function Field({ label, required, children }) {
 }
 
 // tenant = null -> โหมดเพิ่ม, tenant = object -> โหมดแก้ไข
-function TenantForm({ tenant, onClose, onSaved }) {
+function TenantForm({ tenant, onClose }) {
   const isEdit = Boolean(tenant);
+  const createTenant = useCreateTenant();
+  const updateTenant = useUpdateTenant();
 
   const [form, setForm] = useState(() =>
     isEdit
@@ -43,24 +46,20 @@ function TenantForm({ tenant, onClose, onSaved }) {
         }
       : EMPTY
   );
-  const [users, setUsers] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // โหลดบัญชีที่ลงทะเบียน tenant ได้: role = tenant, ยังเปิดใช้งาน, และยังไม่ผูกกับผู้เช่ารายอื่น
-  useEffect(() => {
-    if (isEdit) return;
-    Promise.all([apiGet("/users/"), apiGet("/tenants/")])
-      .then(([allUsers, tenants]) => {
-        const taken = new Set(tenants.map((t) => t.user_id));
-        setUsers(
-          allUsers.filter(
-            (u) => u.role === "tenant" && u.is_active && !taken.has(u.user_id)
-          )
-        );
-      })
-      .catch(() => setUsers([]));
-  }, [isEdit]);
+  const { data: allUsers = [] } = useUsers();
+  const { data: allTenants = [] } = useTenants();
+
+  // บัญชีที่ลงทะเบียน tenant ได้: role = tenant, ยังเปิดใช้งาน, และยังไม่ผูกกับผู้เช่ารายอื่น
+  const users = useMemo(() => {
+    if (isEdit) return [];
+    const taken = new Set(allTenants.map((t) => t.user_id));
+    return allUsers.filter(
+      (u) => u.role === "tenant" && u.is_active && !taken.has(u.user_id)
+    );
+  }, [isEdit, allUsers, allTenants]);
 
   // ปิดด้วยปุ่ม Esc
   useEffect(() => {
@@ -86,11 +85,14 @@ function TenantForm({ tenant, onClose, onSaved }) {
         emergency_contact: form.emergency_contact.trim() || null,
       };
 
-      const saved = isEdit
-        ? await apiPut(`/tenants/${tenant.tenant_id}`, common)
-        : await apiPost("/tenants/", { ...common, user_id: Number(form.user_id) });
-
-      onSaved?.(saved);
+      if (isEdit) {
+        await updateTenant.mutateAsync({ id: tenant.tenant_id, body: common });
+      } else {
+        await createTenant.mutateAsync({
+          ...common,
+          user_id: Number(form.user_id),
+        });
+      }
       onClose?.();
     } catch (err) {
       setError(err.message);

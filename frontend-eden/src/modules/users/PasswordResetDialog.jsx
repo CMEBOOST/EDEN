@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { apiPatch } from "../../lib/api";
+import { useSetUserPassword } from "../../data/users";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
 
 function PasswordResetDialog({ user, onClose }) {
+  const setPassword = useSetUserPassword();
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [busy, setBusy] = useState(false);
@@ -29,7 +30,7 @@ function PasswordResetDialog({ user, onClose }) {
     setBusy(true);
     setError(null);
     try {
-      await apiPatch(`/users/${user.user_id}/password`, { new_password: pw });
+      await setPassword.mutateAsync({ id: user.user_id, new_password: pw });
       alert(`ตั้งรหัสผ่านใหม่ให้ "${user.username}" แล้ว`);
       onClose?.();
     } catch (err) {

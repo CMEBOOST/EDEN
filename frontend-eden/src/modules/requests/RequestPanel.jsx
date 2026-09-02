@@ -1,39 +1,22 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import { useRequests } from "../../data/requests";
 import { typeLabel, typeStyle } from "./requestMeta";
 import RenewDialog from "./RenewDialog";
 import RejectDialog from "./RejectDialog";
 
 // กล่องคำแจ้งความจำนงที่ยังไม่ดำเนินการ — แสดงบนหน้าสัญญาเช่า (staff/admin)
-function RequestPanel({ onActioned }) {
+function RequestPanel() {
   const navigate = useNavigate();
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: pending = [], isPending: p1 } = useRequests("pending");
+  const { data: accepted = [], isPending: p2 } = useRequests("accepted");
   const [renewing, setRenewing] = useState(null);
   const [rejecting, setRejecting] = useState(null);
 
-  const load = useCallback(() => {
-    Promise.all([
-      apiGet("/contract-requests/?status=pending"),
-      apiGet("/contract-requests/?status=accepted"),
-    ])
-      .then(([pending, accepted]) => setRows([...pending, ...accepted]))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false));
-  }, []);
+  const rows = [...pending, ...accepted];
 
-  useEffect(() => {
-    load();
-  }, [load]);
-
-  const afterAction = () => {
-    load();
-    onActioned?.();
-  };
-
-  if (loading || rows.length === 0) return null;
+  if (p1 || p2 || rows.length === 0) return null;
 
   return (
     <div className="border border-amber-200 bg-amber-50/50 rounded-xl overflow-hidden">
@@ -117,14 +100,12 @@ function RequestPanel({ onActioned }) {
         <RenewDialog
           request={renewing}
           onClose={() => setRenewing(null)}
-          onActioned={afterAction}
         />
       )}
       {rejecting && (
         <RejectDialog
           request={rejecting}
           onClose={() => setRejecting(null)}
-          onActioned={afterAction}
         />
       )}
     </div>

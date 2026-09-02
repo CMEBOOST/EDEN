@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
-import { apiGet, apiPut, apiUpload, fileUrl } from "../../lib/api";
+import { useState } from "react";
+import { apiUpload, fileUrl } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
+import { useRooms } from "../../data/rooms";
+import { useUpdateContract } from "../../data/contracts";
 import FileDropField from "../../components/FileDropField";
 
 const inputCls =
@@ -37,21 +39,18 @@ function Row({ label, children }) {
 
 // section ข้อมูลสัญญา — โหมดดู + สลับเป็นโหมดแก้ (PUT /contracts/{id})
 // readOnly = ดูอย่างเดียว (หน้าประวัติ) — ซ่อนปุ่มแก้ไข
-function ContractInfoSection({ contract, onSaved, readOnly = false }) {
+function ContractInfoSection({ contract, readOnly = false }) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
+  const updateContract = useUpdateContract();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [newFile, setNewFile] = useState(null);
-  const [rooms, setRooms] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    if (editing && rooms.length === 0) {
-      apiGet("/rooms/").then(setRooms).catch(() => setRooms([]));
-    }
-  }, [editing, rooms.length]);
+  // โหลดรายการห้องเฉพาะตอนกดแก้ไข
+  const { data: rooms = [] } = useRooms({ enabled: editing });
 
   function startEdit() {
     setForm({
@@ -82,17 +81,19 @@ function ContractInfoSection({ contract, onSaved, readOnly = false }) {
       let contractFileUrl = contract.contract_file_url ?? null;
       if (newFile) contractFileUrl = (await apiUpload(newFile)).url;
 
-      const updated = await apiPut(`/contracts/${contract.contract_id}`, {
-        room_id: form.room_id ? Number(form.room_id) : null,
-        start_date: form.start_date,
-        end_date: form.end_date,
-        rent: Number(form.rent),
-        security_deposit: Number(form.security_deposit),
-        status: form.status,
-        special_conditions: form.special_conditions.trim() || null,
-        contract_file_url: contractFileUrl,
+      await updateContract.mutateAsync({
+        id: contract.contract_id,
+        body: {
+          room_id: form.room_id ? Number(form.room_id) : null,
+          start_date: form.start_date,
+          end_date: form.end_date,
+          rent: Number(form.rent),
+          security_deposit: Number(form.security_deposit),
+          status: form.status,
+          special_conditions: form.special_conditions.trim() || null,
+          contract_file_url: contractFileUrl,
+        },
       });
-      onSaved?.(updated);
       setEditing(false);
     } catch (err) {
       setError(err.message);

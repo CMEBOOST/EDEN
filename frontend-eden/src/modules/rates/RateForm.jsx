@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiPost, apiPut } from "../../lib/api";
+import { useCreateRate, useUpdateRate } from "../../data/rates";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
@@ -21,8 +21,10 @@ function Field({ label, children }) {
 }
 
 // rate = null -> เพิ่ม, rate = object -> แก้ไข
-function RateForm({ rate, onClose, onSaved, onEditExisting }) {
+function RateForm({ rate, onClose, onEditExisting }) {
   const isEdit = Boolean(rate);
+  const createRate = useCreateRate();
+  const updateRate = useUpdateRate();
   const [form, setForm] = useState({
     type: rate?.type ?? "water",
     rate_value: String(rate?.rate_value ?? ""),
@@ -54,10 +56,11 @@ function RateForm({ rate, onClose, onSaved, onEditExisting }) {
         rate_value: Number(form.rate_value),
         effective_date: form.effective_date,
       };
-      const saved = isEdit
-        ? await apiPut(`/rates/${rate.rate_id}`, body)
-        : await apiPost("/rates/", body);
-      onSaved?.(saved);
+      if (isEdit) {
+        await updateRate.mutateAsync({ id: rate.rate_id, body });
+      } else {
+        await createRate.mutateAsync(body);
+      }
       onClose?.();
     } catch (err) {
       if (err.status === 409) {

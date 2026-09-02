@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { apiPost } from "../../lib/api";
+import { useCreateRequest } from "../../data/requests";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
 
 // แจ้งความจำนงล่วงหน้า — ผู้เช่าแจ้งว่าจะต่อหรือยุติสัญญา
-function IntentNoticeDialog({ contractId, onClose, onDone }) {
+function IntentNoticeDialog({ contractId, onClose }) {
+  const createRequest = useCreateRequest();
   const [type, setType] = useState("renew");
   const [preferredDate, setPreferredDate] = useState("");
   const [note, setNote] = useState("");
@@ -27,13 +28,12 @@ function IntentNoticeDialog({ contractId, onClose, onDone }) {
     setSubmitting(true);
     setError(null);
     try {
-      await apiPost("/contract-requests/", {
+      await createRequest.mutateAsync({
         contract_id: contractId,
         request_type: type,
         tenant_note: note.trim(),
         preferred_date: preferredDate || null,
       });
-      onDone?.();
       onClose?.();
     } catch (err) {
       setError(

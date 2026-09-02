@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import { useContracts } from "../../data/contracts";
+import { useTenants } from "../../data/tenants";
 
 // status ตรงกับ contract_status_enum ใน backend
 const statusStyle = {
@@ -20,36 +21,18 @@ const statusLabel = {
 // หน้าประวัติสัญญาเช่า — เฉพาะสัญญาที่ทำ "ตรวจคืนห้อง (check-out)" แล้ว (เสร็จสิ้นกระบวนการ)
 function ContractHistory() {
   const navigate = useNavigate();
-  const [contracts, setContracts] = useState([]);
-  const [tenantsById, setTenantsById] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    data: contracts = [],
+    isPending: loading,
+    error,
+  } = useContracts({ finished: true });
+  const { data: tenantList = [] } = useTenants();
   const [search, setSearch] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [list, tenantList] = await Promise.all([
-          apiGet("/contracts/?finished=true"),
-          apiGet("/tenants/"),
-        ]);
-        if (cancelled) return;
-        setContracts(list);
-        setTenantsById(
-          Object.fromEntries(tenantList.map((t) => [t.tenant_id, t]))
-        );
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const tenantsById = useMemo(
+    () => Object.fromEntries(tenantList.map((t) => [t.tenant_id, t])),
+    [tenantList]
+  );
 
   const tenantName = (id) => tenantsById[id]?.full_name ?? `#${id}`;
 
@@ -118,7 +101,7 @@ function ContractHistory() {
             {error && !loading && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-red-600">
-                  โหลดข้อมูลไม่สำเร็จ: {error}
+                  โหลดข้อมูลไม่สำเร็จ: {error.message}
                 </td>
               </tr>
             )}

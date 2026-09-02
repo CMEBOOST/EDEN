@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiPatch, apiDelete } from "../../lib/api";
+import { useState } from "react";
 import { formatDate } from "../../lib/datetime";
+import {
+  useChecklists,
+  useCreateChecklist,
+  useUpdateChecklist,
+  useDeleteChecklist,
+} from "../../data/checklists";
 import ChecklistEditor from "./ChecklistEditor";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
@@ -32,38 +37,18 @@ const statusItemStyle = {
 // section บันทึกสภาพห้อง (checklists) ของสัญญา — ดู / แก้ / ลบ / เพิ่ม
 // readOnly = ดูอย่างเดียว (หน้าประวัติ) — ซ่อนปุ่มเพิ่ม/แก้/ลบ
 function ChecklistSection({ contractId, readOnly = false }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [tick, setTick] = useState(0);
-  const reload = () => setTick((t) => t + 1);
+  const { data: rows = [], isPending: loading, error: loadError } =
+    useChecklists(contractId);
+  const createChecklist = useCreateChecklist();
+  const updateChecklist = useUpdateChecklist();
+  const deleteChecklist = useDeleteChecklist();
 
   // editing = { cc_id?: number, type: string, items: [], signature: string, isNew: bool }
   const [editing, setEditing] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const data = await apiGet(`/contracts/${contractId}/checklists`);
-        if (!cancelled) {
-          setRows(data);
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [contractId, tick]);
+  const saving = createChecklist.isPending || updateChecklist.isPending;
 
   function startEditExisting(row) {
     setEditing({
@@ -80,44 +65,32 @@ function ChecklistSection({ contractId, readOnly = false }) {
   }
 
   async function handleSave() {
-    setSaving(true);
     setError(null);
     try {
       const items = editing.items.filter((r) => r.name.trim());
       const signature = editing.signature.trim() || null;
+      const body = { type: editing.type, tenant_signature: signature, items };
       if (editing.isNew) {
-        await apiPost(`/contracts/${contractId}/checklists`, {
-          type: editing.type,
-          tenant_signature: signature,
-          items,
-        });
+        await createChecklist.mutateAsync({ contractId, body });
       } else {
-        await apiPatch(
-          `/contracts/${contractId}/checklists/${editing.cc_id}`,
-          { type: editing.type, tenant_signature: signature, items }
-        );
+        await updateChecklist.mutateAsync({
+          contractId,
+          ccId: editing.cc_id,
+          body,
+        });
       }
       setEditing(null);
-      reload();
     } catch (e) {
       setError(e.message);
-    } finally {
-      setSaving(false);
     }
   }
 
   async function handleDelete() {
-    setDeleteBusy(true);
     try {
-      await apiDelete(
-        `/contracts/${contractId}/checklists/${deleting.cc_id}`
-      );
+      await deleteChecklist.mutateAsync({ contractId, ccId: deleting.cc_id });
       setDeleting(null);
-      reload();
     } catch (e) {
       alert(`ลบไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setDeleteBusy(false);
     }
   }
 
@@ -145,9 +118,9 @@ function ChecklistSection({ contractId, readOnly = false }) {
         )}
       </div>
 
-      {error && (
+      {(error || loadError) && (
         <div className="bg-red-50 text-red-700 text-sm rounded px-3 py-2">
-          {error}
+          {error ?? loadError.message}
         </div>
       )}
 
@@ -270,7 +243,7 @@ function ChecklistSection({ contractId, readOnly = false }) {
           }" (${formatDate(deleting.created_at)}) ใช่หรือไม่?`}
           confirmText="ลบ"
           danger
-          busy={deleteBusy}
+          busy={deleteChecklist.isPending}
           onConfirm={handleDelete}
           onClose={() => setDeleting(null)}
         />

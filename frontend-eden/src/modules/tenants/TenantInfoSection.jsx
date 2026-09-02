@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { apiPut } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import { useUpdateTenant } from "../../data/tenants";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
@@ -30,7 +30,8 @@ function maskNationalId(v) {
 }
 
 // section ข้อมูลผู้เช่า — โหมดดู + สลับเป็นโหมดแก้ (PUT /tenants/{id})
-function TenantInfoSection({ tenant, onSaved }) {
+function TenantInfoSection({ tenant }) {
+  const updateTenant = useUpdateTenant();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -56,15 +57,17 @@ function TenantInfoSection({ tenant, onSaved }) {
     setSubmitting(true);
     setError(null);
     try {
-      const updated = await apiPut(`/tenants/${tenant.tenant_id}`, {
-        full_name: form.full_name.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim(),
-        current_address: form.current_address.trim() || null,
-        national_id_encrypted: form.national_id_encrypted.trim() || null,
-        emergency_contact: form.emergency_contact.trim() || null,
+      await updateTenant.mutateAsync({
+        id: tenant.tenant_id,
+        body: {
+          full_name: form.full_name.trim(),
+          phone: form.phone.trim(),
+          email: form.email.trim(),
+          current_address: form.current_address.trim() || null,
+          national_id_encrypted: form.national_id_encrypted.trim() || null,
+          emergency_contact: form.emergency_contact.trim() || null,
+        },
       });
-      onSaved?.(updated);
       setEditing(false);
     } catch (err) {
       setError(err.message);

@@ -1,49 +1,30 @@
-import { useCallback, useEffect, useState } from "react";
-import { apiGet } from "../../lib/api";
+import { useEffect, useMemo, useState } from "react";
 import { formatTimestamp } from "../../lib/datetime";
-
-const PAGE = 50;
+import { useAuditLogs } from "../../data/audit";
+import { useUsers } from "../../data/users";
 
 function AuditLog() {
-  const [logs, setLogs] = useState([]);
-  const [users, setUsers] = useState([]);
+  const { data: users = [] } = useUsers();
   const [userId, setUserId] = useState("");
   const [q, setQ] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [hasMore, setHasMore] = useState(false);
+  const [debouncedQ, setDebouncedQ] = useState("");
 
+  // debounce ช่องค้นหาเบา ๆ
   useEffect(() => {
-    apiGet("/users/")
-      .then(setUsers)
-      .catch(() => setUsers([]));
-  }, []);
-
-  const load = useCallback(
-    async (skip) => {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({ skip, limit: PAGE });
-        if (userId) params.set("user_id", userId);
-        if (q.trim()) params.set("q", q.trim());
-        const batch = await apiGet(`/audit-logs/?${params}`);
-        setLogs((prev) => (skip === 0 ? batch : [...prev, ...batch]));
-        setHasMore(batch.length === PAGE);
-      } catch (e) {
-        setError(e.message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [userId, q]
-  );
-
-  // โหลดใหม่เมื่อ filter เปลี่ยน (debounce เบา ๆ สำหรับช่องค้นหา)
-  useEffect(() => {
-    const t = setTimeout(() => load(0), 250);
+    const t = setTimeout(() => setDebouncedQ(q), 250);
     return () => clearTimeout(t);
-  }, [load]);
+  }, [q]);
+
+  const {
+    data,
+    isPending: loading,
+    isFetchingNextPage,
+    error,
+    hasNextPage,
+    fetchNextPage,
+  } = useAuditLogs({ userId, q: debouncedQ });
+
+  const logs = useMemo(() => (data?.pages ?? []).flat(), [data]);
 
   return (
     <div className="p-2 flex flex-col gap-3 font-sans">
@@ -86,7 +67,7 @@ function AuditLog() {
             {error && (
               <tr>
                 <td colSpan={3} className="px-4 py-6 text-center text-red-600">
-                  โหลดข้อมูลไม่สำเร็จ: {error}
+                  โหลดข้อมูลไม่สำเร็จ: {error.message}
                 </td>
               </tr>
             )}
@@ -108,7 +89,7 @@ function AuditLog() {
                 <td className="px-4 py-2.5 text-gray-800">{l.action}</td>
               </tr>
             ))}
-            {loading && (
+            {(loading || isFetchingNextPage) && (
               <tr>
                 <td colSpan={3} className="px-4 py-4 text-center text-gray-400">
                   กำลังโหลด...
@@ -119,9 +100,9 @@ function AuditLog() {
         </table>
       </div>
 
-      {hasMore && !loading && (
+      {hasNextPage && !isFetchingNextPage && (
         <button
-          onClick={() => load(logs.length)}
+          onClick={() => fetchNextPage()}
           className="self-center px-4 py-2 text-sm rounded border border-gray-300 hover:bg-gray-50"
         >
           โหลดเพิ่ม

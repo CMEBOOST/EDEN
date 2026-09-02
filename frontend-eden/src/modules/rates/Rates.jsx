@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import { apiGet, apiDelete } from "../../lib/api";
+import { useMemo, useState } from "react";
 import { formatDate } from "../../lib/datetime";
+import { useRates, useCurrentRates, useDeleteRate } from "../../data/rates";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import RateForm from "./RateForm";
 
@@ -14,42 +14,13 @@ const fmtBaht = (n) =>
   Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
 
 function Rates() {
-  const [rates, setRates] = useState([]);
-  const [current, setCurrent] = useState({ water: null, electric: null });
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data: rates = [], isPending: loading, error } = useRates();
+  const { data: current = { water: null, electric: null } } = useCurrentRates();
+  const deleteRate = useDeleteRate();
   const [typeFilter, setTypeFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-
-  async function reload() {
-    setError(null);
-    const [list, cur] = await Promise.all([
-      apiGet("/rates/"),
-      apiGet("/rates/current"),
-    ]);
-    setRates(list);
-    setCurrent(cur);
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      try {
-        if (!cancelled) await reload();
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   // id ของอัตราที่ "ใช้อยู่" ตอนนี้ (แยกตามประเภท)
   const activeIds = useMemo(
@@ -70,24 +41,12 @@ function Rates() {
     return { label: "ประวัติ", cls: "bg-gray-100 text-gray-400" };
   }
 
-  async function afterSave() {
-    try {
-      await reload();
-    } catch (e) {
-      setError(e.message);
-    }
-  }
-
   async function handleDelete() {
-    setDeleteBusy(true);
     try {
-      await apiDelete(`/rates/${deleting.rate_id}`);
+      await deleteRate.mutateAsync(deleting.rate_id);
       setDeleting(null);
-      await reload();
     } catch (e) {
       alert(`ลบไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setDeleteBusy(false);
     }
   }
 
@@ -183,7 +142,7 @@ function Rates() {
             {error && !loading && (
               <tr>
                 <td colSpan={5} className="px-4 py-6 text-center text-red-600">
-                  โหลดข้อมูลไม่สำเร็จ: {error}
+                  โหลดข้อมูลไม่สำเร็จ: {error.message}
                 </td>
               </tr>
             )}
@@ -258,7 +217,6 @@ function Rates() {
             setShowForm(false);
             setEditing(null);
           }}
-          onSaved={afterSave}
           onEditExisting={(id) => {
             const target = rates.find((r) => r.rate_id === id);
             if (target) {
@@ -282,7 +240,7 @@ function Rates() {
           }
           confirmText="ลบ"
           danger
-          busy={deleteBusy}
+          busy={deleteRate.isPending}
           onConfirm={handleDelete}
           onClose={() => setDeleting(null)}
         />

@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet, apiPost, apiUpload } from "../../lib/api";
+import { apiUpload } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import { useTenants } from "../../data/tenants";
+import { useRooms } from "../../data/rooms";
+import { useCurrentRates } from "../../data/rates";
+import { useCreateContract } from "../../data/contracts";
 import ChecklistEditor from "./ChecklistEditor";
 import DocumentUploader from "./DocumentUploader";
 import FileDropField from "../../components/FileDropField";
@@ -53,9 +57,10 @@ function Field({ label, required, children }) {
 
 function ContractForm() {
   const navigate = useNavigate();
+  const createContract = useCreateContract();
 
-  const [tenants, setTenants] = useState([]);
-  const [rooms, setRooms] = useState([]); // ห้องว่าง (สำหรับ dropdown)
+  const { data: tenants = [] } = useTenants();
+  const { data: rooms = [] } = useRooms({ available: true }); // ห้องว่าง (สำหรับ dropdown)
   const [contract, setContract] = useState({
     tenant_id: "",
     room_id: "",
@@ -71,18 +76,10 @@ function ContractForm() {
   const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
   const [documents, setDocuments] = useState([]);
 
-  const [rates, setRates] = useState(null); // อัตราค่าน้ำ/ค่าไฟ ณ วันเริ่มสัญญา (แสดงเฉย ๆ)
+  // อัตราค่าน้ำ/ค่าไฟ ณ วันเริ่มสัญญา (แสดงเฉย ๆ)
+  const { data: rates = null } = useCurrentRates(contract.start_date || undefined);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-
-  useEffect(() => {
-    apiGet("/tenants/")
-      .then(setTenants)
-      .catch((e) => setError(e.message));
-    apiGet("/rooms/?available=true")
-      .then(setRooms)
-      .catch(() => setRooms([]));
-  }, []);
 
   // เลือกห้อง -> เติมค่าเช่าตั้งต้นของห้องนั้นให้ (แก้ต่อได้)
   const pickRoom = (e) => {
@@ -94,14 +91,6 @@ function ContractForm() {
       rent: room ? String(room.base_rent) : c.rent,
     }));
   };
-
-  // ดึงอัตราที่มีผล ณ วันเริ่มสัญญา (ไม่ได้เก็บลง contract — ใช้ประกอบการพิจารณา)
-  useEffect(() => {
-    const q = contract.start_date ? `?date=${contract.start_date}` : "";
-    apiGet(`/rates/current${q}`)
-      .then(setRates)
-      .catch(() => setRates(null));
-  }, [contract.start_date]);
 
   const set = (key) => (e) =>
     setContract((c) => ({ ...c, [key]: e.target.value }));
@@ -118,7 +107,7 @@ function ContractForm() {
       }
 
       // 2. สัญญา + checklist check-in + เอกสาร — ทรานแซกชันเดียว (atomic)
-      await apiPost("/contracts/", {
+      await createContract.mutateAsync({
         tenant_id: Number(contract.tenant_id),
         room_id: contract.room_id ? Number(contract.room_id) : null,
         start_date: contract.start_date,

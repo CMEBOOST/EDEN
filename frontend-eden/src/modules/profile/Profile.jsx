@@ -1,6 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiPatch, apiUpload } from "../../lib/api";
+import { useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
+import {
+  useProfile,
+  useUpdateProfileAvatar,
+  useUpdateProfilePassword,
+  useUpdateProfileContact,
+} from "../../data/profile";
 import AvatarPicker from "../../components/AvatarPicker";
 
 const inputCls =
@@ -37,28 +42,22 @@ function ErrorBanner({ children }) {
 
 /* ---------- การ์ดบัญชี (avatar + ข้อมูลอ่านอย่างเดียว) ---------- */
 function AccountCard({ user, onSaved }) {
+  const updateAvatar = useUpdateProfileAvatar();
   const [avatarValue, setAvatarValue] = useState(user.avatar_url ?? null);
   const [file, setFile] = useState(null);
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const busy = updateAvatar.isPending;
 
   const dirty = file || avatarValue !== (user.avatar_url ?? null);
 
   async function save() {
-    setBusy(true);
     setError(null);
     try {
-      if (file) {
-        await apiUpload(file, "/profile/avatar");
-      } else {
-        await apiPatch("/profile/avatar", { avatar_url: avatarValue });
-      }
+      await updateAvatar.mutateAsync({ file, avatar_url: avatarValue });
       setFile(null);
       await onSaved();
     } catch (e) {
       setError(e.message);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -103,20 +102,20 @@ function AccountCard({ user, onSaved }) {
 
 /* ---------- การ์ดเปลี่ยนรหัสผ่าน ---------- */
 function PasswordCard() {
+  const updatePassword = useUpdateProfilePassword();
   const [cur, setCur] = useState("");
   const [nw, setNw] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const busy = updatePassword.isPending;
 
   async function save(e) {
     e.preventDefault();
     if (nw.length < 6) return setError("รหัสผ่านใหม่อย่างน้อย 6 ตัว");
     if (nw !== confirm) return setError("รหัสผ่านใหม่ทั้งสองช่องไม่ตรงกัน");
-    setBusy(true);
     setError(null);
     try {
-      await apiPatch("/profile/password", {
+      await updatePassword.mutateAsync({
         current_password: cur,
         new_password: nw,
       });
@@ -126,8 +125,6 @@ function PasswordCard() {
       alert("เปลี่ยนรหัสผ่านแล้ว");
     } catch (e) {
       setError(e.message);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -187,16 +184,16 @@ function ContactCard({ tenant, onSaved }) {
     current_address: tenant.current_address ?? "",
     emergency_contact: tenant.emergency_contact ?? "",
   });
-  const [busy, setBusy] = useState(false);
+  const updateContact = useUpdateProfileContact();
   const [error, setError] = useState(null);
+  const busy = updateContact.isPending;
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   async function save(e) {
     e.preventDefault();
-    setBusy(true);
     setError(null);
     try {
-      await apiPatch("/profile/tenant", {
+      await updateContact.mutateAsync({
         full_name: form.full_name.trim(),
         phone: form.phone.trim(),
         email: form.email.trim(),
@@ -207,8 +204,6 @@ function ContactCard({ tenant, onSaved }) {
       alert("บันทึกข้อมูลติดต่อแล้ว");
     } catch (e) {
       setError(e.message);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -281,24 +276,15 @@ function ContactCard({ tenant, onSaved }) {
 
 function Profile() {
   const { user, refreshUser } = useAuth();
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
-
-  const load = useCallback(
-    () =>
-      apiGet("/profile/")
-        .then(setData)
-        .catch((e) => setError(e.message)),
-    []
-  );
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data, isPending, error, refetch } = useProfile();
 
   if (error)
-    return <div className="p-6 text-red-600 font-sans">โหลดข้อมูลไม่สำเร็จ: {error}</div>;
-  if (!data)
+    return (
+      <div className="p-6 text-red-600 font-sans">
+        โหลดข้อมูลไม่สำเร็จ: {error.message}
+      </div>
+    );
+  if (isPending)
     return <div className="p-6 text-gray-400 font-sans">กำลังโหลด...</div>;
 
   return (
@@ -309,14 +295,14 @@ function Profile() {
         user={data.user ?? user}
         onSaved={async () => {
           await refreshUser();
-          await load();
+          await refetch();
         }}
       />
 
       <PasswordCard />
 
       {data.tenant && (
-        <ContactCard tenant={data.tenant} onSaved={load} />
+        <ContactCard tenant={data.tenant} onSaved={refetch} />
       )}
     </div>
   );

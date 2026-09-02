@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
-import { apiPatch, apiUpload } from "../../lib/api";
+import { apiUpload } from "../../lib/api";
+import { useUpdateUser } from "../../data/users";
 import AvatarPicker from "../../components/AvatarPicker";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
 
-function UserEditModal({ user, onClose, onSaved }) {
+function UserEditModal({ user, onClose }) {
+  const updateUser = useUpdateUser();
   const [username, setUsername] = useState(user.username);
   // avatarValue: string | null — ค่าที่จะส่ง (พรีเซ็ต/null); file = ไฟล์ที่รออัป
   const [avatarValue, setAvatarValue] = useState(user.avatar_url ?? null);
@@ -37,8 +39,7 @@ function UserEditModal({ user, onClose, onSaved }) {
         onClose?.();
         return;
       }
-      const updated = await apiPatch(`/users/${user.user_id}`, patch);
-      onSaved?.(updated);
+      await updateUser.mutateAsync({ id: user.user_id, body: patch });
       onClose?.();
     } catch (err) {
       setError(err.status === 409 ? "username นี้มีอยู่แล้ว" : err.message);

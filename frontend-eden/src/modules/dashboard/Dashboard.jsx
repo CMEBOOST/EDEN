@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiDelete, fileUrl } from "../../lib/api";
+import { useState } from "react";
+import { fileUrl } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
+import { useDashboard } from "../../data/dashboard";
+import { useCancelRequest } from "../../data/requests";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import IntentNoticeDialog from "../requests/IntentNoticeDialog";
 import { statusLabel, statusStyle, typeLabel, OPEN_STATUSES } from "../requests/requestMeta";
@@ -135,26 +137,22 @@ function RequestStatusBox({ request, onCancel }) {
   );
 }
 
-function TenantDashboard({ data, onReload }) {
+function TenantDashboard({ data }) {
   const { tenant, contract, documents, rates, request } = data;
+  const cancelRequest = useCancelRequest();
   const [showNotice, setShowNotice] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [cancelBusy, setCancelBusy] = useState(false);
   const canNotify =
     contract &&
     contract.status === "active" &&
     !(request && OPEN_STATUSES.includes(request.status));
 
   async function handleCancel() {
-    setCancelBusy(true);
     try {
-      await apiDelete(`/contract-requests/${request.request_id}`);
+      await cancelRequest.mutateAsync(request.request_id);
       setCancelling(false);
-      onReload?.();
     } catch (e) {
       alert(`ยกเลิกไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setCancelBusy(false);
     }
   }
 
@@ -225,7 +223,6 @@ function TenantDashboard({ data, onReload }) {
         <IntentNoticeDialog
           contractId={contract.contract_id}
           onClose={() => setShowNotice(false)}
-          onDone={onReload}
         />
       )}
 
@@ -237,7 +234,7 @@ function TenantDashboard({ data, onReload }) {
           }" ใช่หรือไม่? หากยกเลิกแล้วต้องแจ้งใหม่`}
           confirmText="ยกเลิกการแจ้ง"
           danger
-          busy={cancelBusy}
+          busy={cancelRequest.isPending}
           onConfirm={handleCancel}
           onClose={() => setCancelling(false)}
         />
@@ -279,26 +276,19 @@ function TenantDashboard({ data, onReload }) {
 
 function Dashboard() {
   const { user } = useAuth();
-  const [data, setData] = useState(null);
-  const [error, setError] = useState(null);
-
-  const load = useCallback(() => {
-    apiGet("/dashboard/")
-      .then(setData)
-      .catch((e) => setError(e.message));
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  const { data, isPending, error } = useDashboard();
 
   if (error)
-    return <div className="p-6 text-red-600 font-sans">โหลดข้อมูลไม่สำเร็จ: {error}</div>;
-  if (!data)
+    return (
+      <div className="p-6 text-red-600 font-sans">
+        โหลดข้อมูลไม่สำเร็จ: {error.message}
+      </div>
+    );
+  if (isPending)
     return <div className="p-6 text-gray-400 font-sans">กำลังโหลด...</div>;
 
   return user?.role === "tenant" ? (
-    <TenantDashboard data={data} onReload={load} />
+    <TenantDashboard data={data} />
   ) : (
     <StaffAdminDashboard data={data} />
   );

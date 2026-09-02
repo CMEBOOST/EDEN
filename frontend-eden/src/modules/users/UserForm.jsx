@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiPost } from "../../lib/api";
+import { useCreateUser } from "../../data/users";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
@@ -19,7 +19,8 @@ function Field({ label, children }) {
   );
 }
 
-function UserForm({ onClose, onCreated }) {
+function UserForm({ onClose }) {
+  const createUser = useCreateUser();
   const [form, setForm] = useState({
     username: "",
     password: "",
@@ -41,12 +42,11 @@ function UserForm({ onClose, onCreated }) {
     setBusy(true);
     setError(null);
     try {
-      const created = await apiPost("/users/", {
+      await createUser.mutateAsync({
         username: form.username.trim(),
         password: form.password,
         role: form.role,
       });
-      onCreated?.(created);
       onClose?.();
     } catch (err) {
       setError(err.message);

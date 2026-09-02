@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiDelete } from "../../lib/api";
 import { useAuth } from "../../auth/AuthContext";
+import { useTenant, useDeactivateTenant } from "../../data/tenants";
+import { useUser } from "../../data/users";
+import { useContracts } from "../../data/contracts";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ContractDocuments from "../contracts/ContractDocuments";
 import TenantInfoSection from "./TenantInfoSection";
@@ -15,55 +17,18 @@ function TenantDetail() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
 
-  const [tenant, setTenant] = useState(null);
-  const [linkedUser, setLinkedUser] = useState(null);
-  const [contracts, setContracts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data: tenant, isPending: loading, error } = useTenant(tenantId);
+  const { data: linkedUser = null } = useUser(tenant?.user_id);
+  const { data: contracts = [] } = useContracts({ tenant_id: tenantId });
+  const deactivate = useDeactivateTenant();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const t = await apiGet(`/tenants/${tenantId}`);
-        if (cancelled) return;
-        setTenant(t);
-        try {
-          const [u, cs] = await Promise.all([
-            apiGet(`/users/${t.user_id}`),
-            apiGet(`/contracts/?tenant_id=${tenantId}`),
-          ]);
-          if (!cancelled) {
-            setLinkedUser(u);
-            setContracts(cs);
-          }
-        } catch {
-          /* ไม่ critical — ยังแสดงหน้าได้ */
-        }
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantId]);
 
   async function handleDelete() {
-    setDeleteBusy(true);
     try {
-      await apiDelete(`/tenants/${tenantId}`);
+      await deactivate.mutateAsync(tenantId);
       navigate("/tenants");
     } catch (e) {
       alert(`ปิดใช้งานไม่สำเร็จ: ${e.message}`);
-      setDeleteBusy(false);
       setConfirmDelete(false);
     }
   }
@@ -74,7 +39,7 @@ function TenantDetail() {
     return (
       <div className="p-6 font-sans flex flex-col gap-3">
         <div className="text-red-600">
-          {error ? `โหลดข้อมูลไม่สำเร็จ: ${error}` : "ไม่พบผู้เช่า"}
+          {error ? `โหลดข้อมูลไม่สำเร็จ: ${error.message}` : "ไม่พบผู้เช่า"}
         </div>
         <button
           type="button"
@@ -127,7 +92,7 @@ function TenantDetail() {
         )}
       </div>
 
-      <TenantInfoSection tenant={tenant} onSaved={setTenant} />
+      <TenantInfoSection tenant={tenant} />
       <TenantAccountSection user={linkedUser} />
       <TenantContractsSection contracts={contracts} />
       <ContractDocuments tenantId={tenantId} />
@@ -138,7 +103,7 @@ function TenantDetail() {
           message={`ปิดการใช้งาน "${tenant.full_name}" ? บัญชีผู้ใช้จะเข้าสู่ระบบไม่ได้ (ข้อมูลยังเก็บไว้)`}
           confirmText="ปิดใช้งาน"
           danger
-          busy={deleteBusy}
+          busy={deactivate.isPending}
           onConfirm={handleDelete}
           onClose={() => setConfirmDelete(false)}
         />

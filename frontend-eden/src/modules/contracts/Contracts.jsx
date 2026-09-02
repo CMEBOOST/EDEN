@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet, apiDelete } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
+import { useContracts, useDeleteContract } from "../../data/contracts";
+import { useTenants } from "../../data/tenants";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import RequestPanel from "../requests/RequestPanel";
 
@@ -25,59 +26,29 @@ function Contracts() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const [contracts, setContracts] = useState([]);
-  const [tenantsById, setTenantsById] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    data: contracts = [],
+    isPending: loading,
+    error,
+  } = useContracts({ finished: false });
+  const { data: tenantList = [] } = useTenants();
+  const deleteContract = useDeleteContract();
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-  const [tick, setTick] = useState(0);
-  const reload = () => setTick((t) => t + 1);
+
+  const tenantsById = useMemo(
+    () => Object.fromEntries(tenantList.map((t) => [t.tenant_id, t])),
+    [tenantList]
+  );
 
   async function handleDelete() {
-    setDeleteBusy(true);
     try {
-      await apiDelete(`/contracts/${deleting.contract_id}`);
-      setContracts((prev) =>
-        prev.filter((c) => c.contract_id !== deleting.contract_id)
-      );
+      await deleteContract.mutateAsync(deleting.contract_id);
       setDeleting(null);
     } catch (e) {
       alert(`ลบไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setDeleteBusy(false);
     }
   }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const [contractList, tenantList] = await Promise.all([
-          apiGet("/contracts/?finished=false"),
-          apiGet("/tenants/"),
-        ]);
-        if (cancelled) return;
-        setContracts(contractList);
-        setTenantsById(
-          Object.fromEntries(tenantList.map((t) => [t.tenant_id, t]))
-        );
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [tick]);
 
   const tenantName = (id) => tenantsById[id]?.full_name ?? `#${id}`;
 
@@ -117,7 +88,7 @@ function Contracts() {
         </div>
       </div>
 
-      <RequestPanel onActioned={reload} />
+      <RequestPanel />
 
       <div className="bg-gray-50 flex p-2 justify-start items-center rounded">
         <input
@@ -156,7 +127,7 @@ function Contracts() {
             {error && !loading && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-red-600">
-                  โหลดข้อมูลไม่สำเร็จ: {error}
+                  โหลดข้อมูลไม่สำเร็จ: {error.message}
                 </td>
               </tr>
             )}
@@ -239,7 +210,7 @@ function Contracts() {
           )}) ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`}
           confirmText="ลบ"
           danger
-          busy={deleteBusy}
+          busy={deleteContract.isPending}
           onConfirm={handleDelete}
           onClose={() => setDeleting(null)}
         />

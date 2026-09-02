@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { apiPatch } from "../../lib/api";
+import { useUpdateRequest } from "../../data/requests";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
 
 // ปฏิเสธคำแจ้งความจำนง — ต้องระบุเหตุผล
-function RejectDialog({ request, onClose, onActioned }) {
+function RejectDialog({ request, onClose }) {
+  const updateRequest = useUpdateRequest();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -25,11 +26,10 @@ function RejectDialog({ request, onClose, onActioned }) {
     setSubmitting(true);
     setError(null);
     try {
-      await apiPatch(`/contract-requests/${request.request_id}`, {
-        status: "rejected",
-        staff_note: reason.trim(),
+      await updateRequest.mutateAsync({
+        id: request.request_id,
+        body: { status: "rejected", staff_note: reason.trim() },
       });
-      onActioned?.();
       onClose?.();
     } catch (err) {
       setError(err.message);

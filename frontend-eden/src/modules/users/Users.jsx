@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
-import { apiGet, apiPatch } from "../../lib/api";
+import { useMemo, useState } from "react";
 import { formatDate } from "../../lib/datetime";
 import { avatarSrc } from "../../lib/avatar";
 import { useAuth } from "../../auth/AuthContext";
+import { useUsers, useSetUserRole, useSetUserActive } from "../../data/users";
+import { useTenants } from "../../data/tenants";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import UserForm from "./UserForm";
 import UserEditModal from "./UserEditModal";
@@ -26,63 +27,39 @@ const roleStyle = {
 
 function Users() {
   const { user: me } = useAuth();
-  const [users, setUsers] = useState([]);
-  const [tenantsByUser, setTenantsByUser] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [rowBusy, setRowBusy] = useState(null);
+  const { data: users = [], isPending: loading, error } = useUsers();
+  const { data: tenants = [] } = useTenants();
+  const setRole = useSetUserRole();
+  const setUserActive = useSetUserActive();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [resetting, setResetting] = useState(null);
   const [deactivating, setDeactivating] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const [us, ts] = await Promise.all([
-          apiGet("/users/"),
-          apiGet("/tenants/"),
-        ]);
-        if (cancelled) return;
-        setUsers(us);
-        setTenantsByUser(
-          Object.fromEntries(ts.map((t) => [t.user_id, t]))
-        );
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const rowBusy =
+    setRole.isPending || setUserActive.isPending
+      ? (setRole.variables?.id ?? setUserActive.variables?.id)
+      : null;
 
-  const replaceRow = (u) =>
-    setUsers((prev) => prev.map((x) => (x.user_id === u.user_id ? u : x)));
+  const tenantsByUser = useMemo(
+    () => Object.fromEntries(tenants.map((t) => [t.user_id, t])),
+    [tenants]
+  );
 
   async function changeRole(u, role) {
-    setRowBusy(u.user_id);
     try {
-      replaceRow(await apiPatch(`/users/${u.user_id}/role`, { role }));
+      await setRole.mutateAsync({ id: u.user_id, role });
     } catch (e) {
       alert(`เปลี่ยน role ไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setRowBusy(null);
     }
   }
 
   async function setActive(u, is_active) {
-    setRowBusy(u.user_id);
     try {
-      replaceRow(await apiPatch(`/users/${u.user_id}`, { is_active }));
+      await setUserActive.mutateAsync({ id: u.user_id, is_active });
       setDeactivating(null);
     } catch (e) {
       alert(`อัปเดตสถานะไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setRowBusy(null);
     }
   }
 
@@ -132,7 +109,7 @@ function Users() {
             {error && !loading && (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-red-600">
-                  โหลดข้อมูลไม่สำเร็จ: {error}
+                  โหลดข้อมูลไม่สำเร็จ: {error.message}
                 </td>
               </tr>
             )}
@@ -244,19 +221,10 @@ function Users() {
         </table>
       </div>
 
-      {showForm && (
-        <UserForm
-          onClose={() => setShowForm(false)}
-          onCreated={(u) => setUsers((prev) => [...prev, u])}
-        />
-      )}
+      {showForm && <UserForm onClose={() => setShowForm(false)} />}
 
       {editing && (
-        <UserEditModal
-          user={editing}
-          onClose={() => setEditing(null)}
-          onSaved={replaceRow}
-        />
+        <UserEditModal user={editing} onClose={() => setEditing(null)} />
       )}
 
       {resetting && (

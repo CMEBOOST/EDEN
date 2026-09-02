@@ -1,6 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { apiGet, apiPost, apiPatch, fileUrl } from "../../lib/api";
+import { fileUrl } from "../../lib/api";
+import { useContract } from "../../data/contracts";
+import { useChecklists, useCreateChecklist } from "../../data/checklists";
+import { useUpdateRequest } from "../../data/requests";
 import ChecklistEditor from "../contracts/ChecklistEditor";
 
 const fmtBaht = (n) =>
@@ -19,54 +22,45 @@ function CheckoutInspection() {
   const requestId = params.get("request");
   const navigate = useNavigate();
 
-  const [contract, setContract] = useState(null);
-  const [checkin, setCheckin] = useState(null);
+  const { data: contract = null, isPending: loadingContract } =
+    useContract(contractId);
+  const { data: lists, isPending: loadingLists, error: loadError } =
+    useChecklists(contractId);
+  const createChecklist = useCreateChecklist();
+  const updateRequest = useUpdateRequest();
+  const loading = loadingContract || loadingLists;
+
+  const checkin = useMemo(() => {
+    const ins = (lists ?? []).filter((l) => l.type === "check-in");
+    return ins[ins.length - 1] ?? null;
+  }, [lists]);
+
   const [checkout, setCheckout] = useState([]);
+  const [seeded, setSeeded] = useState(false);
   const [signature, setSignature] = useState("");
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const [ctr, lists] = await Promise.all([
-          apiGet(`/contracts/${contractId}`),
-          apiGet(`/contracts/${contractId}/checklists`),
-        ]);
-        if (cancelled) return;
-        setContract(ctr);
-        const ins = lists.filter((l) => l.type === "check-in");
-        const outs = lists.filter((l) => l.type === "check-out");
-        const lastIn = ins[ins.length - 1] ?? null;
-        setCheckin(lastIn);
-
-        const source =
-          outs[outs.length - 1]?.checklist_items ??
-          lastIn?.checklist_items ??
-          [];
-        setCheckout(
-          source.map((it) => ({
-            name: it.name,
-            status: "ปกติ",
-            note: "",
-            photos: [],
-            cost: 0,
-          }))
-        );
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [contractId]);
+  // seed รายการตรวจออกจากข้อมูล check-in/out ที่มี — ครั้งเดียวตอนโหลดเสร็จ
+  if (!seeded && lists) {
+    const outs = lists.filter((l) => l.type === "check-out");
+    const ins = lists.filter((l) => l.type === "check-in");
+    const source =
+      outs[outs.length - 1]?.checklist_items ??
+      ins[ins.length - 1]?.checklist_items ??
+      [];
+    setCheckout(
+      source.map((it) => ({
+        name: it.name,
+        status: "ปกติ",
+        note: "",
+        photos: [],
+        cost: 0,
+      }))
+    );
+    setSeeded(true);
+  }
 
   const damageTotal = useMemo(
     () => checkout.reduce((s, r) => s + (Number(r.cost) || 0), 0),
@@ -79,15 +73,18 @@ function CheckoutInspection() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiPost(`/contracts/${contractId}/checklists`, {
-        type: "check-out",
-        tenant_signature: signature.trim() || null,
-        items: checkout.filter((r) => r.name.trim()),
+      await createChecklist.mutateAsync({
+        contractId,
+        body: {
+          type: "check-out",
+          tenant_signature: signature.trim() || null,
+          items: checkout.filter((r) => r.name.trim()),
+        },
       });
       if (requestId) {
-        await apiPatch(`/contract-requests/${requestId}`, {
-          status: "completed",
-          damage_total: damageTotal,
+        await updateRequest.mutateAsync({
+          id: requestId,
+          body: { status: "completed", damage_total: damageTotal },
         });
       }
       setDone(true);
@@ -100,10 +97,10 @@ function CheckoutInspection() {
 
   if (loading)
     return <div className="p-6 text-gray-400 font-sans">กำลังโหลด...</div>;
-  if (error && !contract)
+  if (loadError && !contract)
     return (
       <div className="p-6 text-red-600 font-sans">
-        โหลดข้อมูลไม่สำเร็จ: {error}
+        โหลดข้อมูลไม่สำเร็จ: {loadError.message}
       </div>
     );
 

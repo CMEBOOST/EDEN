@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiGet, apiDelete } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
 import { useAuth } from "../../auth/AuthContext";
+import { useTenants, useDeactivateTenant } from "../../data/tenants";
 import TenantForm from "./TenantForm";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
@@ -10,59 +10,20 @@ function Tenants() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
-  const [tenants, setTenants] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data: tenants = [], isPending: loading, error } = useTenants();
+  const deactivate = useDeactivateTenant();
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [deleting, setDeleting] = useState(null); // ผู้เช่าที่กำลังจะปิดใช้งาน
-  const [deleteBusy, setDeleteBusy] = useState(false);
-
-  function upsertTenant(saved) {
-    setTenants((prev) => {
-      const exists = prev.some((t) => t.tenant_id === saved.tenant_id);
-      return exists
-        ? prev.map((t) => (t.tenant_id === saved.tenant_id ? saved : t))
-        : [...prev, saved];
-    });
-  }
 
   async function handleDelete() {
-    setDeleteBusy(true);
     try {
-      await apiDelete(`/tenants/${deleting.tenant_id}`);
-      setTenants((prev) =>
-        prev.filter((t) => t.tenant_id !== deleting.tenant_id)
-      );
+      await deactivate.mutateAsync(deleting.tenant_id);
       setDeleting(null);
     } catch (e) {
       alert(`ปิดใช้งานไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setDeleteBusy(false);
     }
   }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const data = await apiGet("/tenants/");
-        if (!cancelled) setTenants(data);
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -93,11 +54,7 @@ function Tenants() {
       </div>
 
       {showForm && (
-        <TenantForm
-          tenant={null}
-          onClose={() => setShowForm(false)}
-          onSaved={upsertTenant}
-        />
+        <TenantForm tenant={null} onClose={() => setShowForm(false)} />
       )}
 
       {deleting && (
@@ -106,7 +63,7 @@ function Tenants() {
           message={`ปิดการใช้งาน "${deleting.full_name}" ? บัญชีผู้ใช้จะเข้าสู่ระบบไม่ได้ (ข้อมูลยังเก็บไว้)`}
           confirmText="ปิดใช้งาน"
           danger
-          busy={deleteBusy}
+          busy={deactivate.isPending}
           onConfirm={handleDelete}
           onClose={() => setDeleting(null)}
         />
@@ -149,7 +106,7 @@ function Tenants() {
             {error && !loading && (
               <tr>
                 <td colSpan={7} className="px-4 py-6 text-center text-red-600">
-                  โหลดข้อมูลไม่สำเร็จ: {error}
+                  โหลดข้อมูลไม่สำเร็จ: {error.message}
                 </td>
               </tr>
             )}

@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
-import { apiPut, apiPatch } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import { useUpdateContract } from "../../data/contracts";
+import { useUpdateRequest } from "../../data/requests";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
 
 // รับเรื่องต่อสัญญา — ขยาย end_date ของสัญญาเดิม แล้วปิดคำขอ
-function RenewDialog({ request, onClose, onActioned }) {
+function RenewDialog({ request, onClose }) {
+  const updateContract = useUpdateContract();
+  const updateRequest = useUpdateRequest();
   const currentEnd = request.contract_end_date;
   const [endDate, setEndDate] = useState(request.preferred_date || "");
   const [note, setNote] = useState("");
@@ -32,12 +35,14 @@ function RenewDialog({ request, onClose, onActioned }) {
     setSubmitting(true);
     setError(null);
     try {
-      await apiPut(`/contracts/${request.contract_id}`, { end_date: endDate });
-      await apiPatch(`/contract-requests/${request.request_id}`, {
-        status: "completed",
-        staff_note: note.trim() || null,
+      await updateContract.mutateAsync({
+        id: request.contract_id,
+        body: { end_date: endDate },
       });
-      onActioned?.();
+      await updateRequest.mutateAsync({
+        id: request.request_id,
+        body: { status: "completed", staff_note: note.trim() || null },
+      });
       onClose?.();
     } catch (err) {
       setError(err.message);

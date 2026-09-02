@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiDelete } from "../../lib/api";
 import { useAuth } from "../../auth/AuthContext";
+import { useContract, useDeleteContract } from "../../data/contracts";
+import { useTenant } from "../../data/tenants";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import ContractInfoSection from "./ContractInfoSection";
 import ChecklistSection from "./ChecklistSection";
@@ -29,48 +30,17 @@ function ContractDetail({ readOnly = false }) {
   const isAdmin = user?.role === "admin";
   const backTo = readOnly ? "/contracts/history" : "/contracts";
 
-  const [contract, setContract] = useState(null);
-  const [tenant, setTenant] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data: contract, isPending: loading, error } = useContract(contractId);
+  const { data: tenant = null } = useTenant(contract?.tenant_id);
+  const deleteContract = useDeleteContract();
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleteBusy, setDeleteBusy] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const ctr = await apiGet(`/contracts/${contractId}`);
-        if (cancelled) return;
-        setContract(ctr);
-        try {
-          const t = await apiGet(`/tenants/${ctr.tenant_id}`);
-          if (!cancelled) setTenant(t);
-        } catch {
-          /* ไม่ critical — ยังแสดงหน้าได้ */
-        }
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [contractId]);
 
   async function handleDelete() {
-    setDeleteBusy(true);
     try {
-      await apiDelete(`/contracts/${contractId}`);
+      await deleteContract.mutateAsync(contractId);
       navigate("/contracts");
     } catch (e) {
       alert(`ลบไม่สำเร็จ: ${e.message}`);
-      setDeleteBusy(false);
       setConfirmDelete(false);
     }
   }
@@ -80,7 +50,7 @@ function ContractDetail({ readOnly = false }) {
   if (error || !contract)
     return (
       <div className="p-6 font-sans flex flex-col gap-3">
-        <div className="text-red-600">{error ?? "ไม่พบสัญญา"}</div>
+        <div className="text-red-600">{error?.message ?? "ไม่พบสัญญา"}</div>
         <button
           type="button"
           onClick={() => navigate(backTo)}
@@ -143,11 +113,7 @@ function ContractDetail({ readOnly = false }) {
         )}
       </div>
 
-      <ContractInfoSection
-        contract={contract}
-        onSaved={setContract}
-        readOnly={readOnly}
-      />
+      <ContractInfoSection contract={contract} readOnly={readOnly} />
       <ChecklistSection contractId={contractId} readOnly={readOnly} />
       <ContractDocuments tenantId={contract.tenant_id} readOnly={readOnly} />
 
@@ -157,7 +123,7 @@ function ContractDetail({ readOnly = false }) {
           message={`ต้องการลบสัญญา #${contractId} ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`}
           confirmText="ลบ"
           danger
-          busy={deleteBusy}
+          busy={deleteContract.isPending}
           onConfirm={handleDelete}
           onClose={() => setConfirmDelete(false)}
         />

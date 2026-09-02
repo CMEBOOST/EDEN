@@ -55,7 +55,8 @@ EDEN/
 ├── frontend-eden/             # React + Vite — src/ จัดเป็น module-based
 │   ├── src/
 │   │   ├── App.jsx (routing + <RequireAuth>)  main.jsx  index.css
-│   │   ├── lib/          # api.js (Bearer header, 401→logout, apiGet/Post/Put/Patch/Delete/Upload/Login), auth.js (token), datetime.js, avatar.js (avatarSrc + พรีเซ็ต)
+│   │   ├── lib/          # api.js (Bearer header, 401→logout, apiGet/Post/Put/Patch/Delete/Upload/Login), auth.js (token), datetime.js, avatar.js, queryClient.js (QueryClient + ล้าง cache ตอน auth:logout)
+│   │   ├── data/         # ชั้น data (TanStack Query) ต่อ domain — keys.js (qk factory) + tenants/users/contracts/checklists/documents/rates/rooms/requests/dashboard/profile/audit.js (query hook + mutation hook + invalidate)
 │   │   ├── auth/         # AuthContext.jsx (useAuth: user/login/logout), RequireAuth.jsx
 │   │   ├── components/   # ConfirmDialog.jsx, FileDropField.jsx, AvatarPicker.jsx (พรีเซ็ต/อัปโหลด/ค่าเริ่มต้น)
 │   │   ├── layout/       # Sidebar.jsx (เมนูตาม role), Topbar.jsx (breadcrumb + user dropdown), breadcrumbs.js (crumbsFor)
@@ -267,7 +268,7 @@ npm run dev
 - [x] Profile `/profile` (เข้าจาก Topbar) — avatar + เปลี่ยนรหัสตัวเอง (UC6.2) + ผู้เช่าแก้ข้อมูลติดต่อตัวเอง (UC2.5, ยกเว้น national_id)
 - [x] หน้า contract detail `/contracts/:id` (ContractDetail + InfoSection/ChecklistSection/Documents) + ประวัติสัญญา `/contracts/history`
 - [x] หน้า tenant detail `/tenants/:id` (TenantDetail — ข้อมูลผู้เช่า ดู/แก้ + บัญชีผู้ใช้ + สัญญา + เอกสาร) · list row คลิก→detail เหมือน contracts
-- [ ] state management (ตอนนี้ fetch ใน useEffect ต่อหน้า)
+- [x] state management — TanStack Query v5 · `QueryClientProvider` ใน `main.jsx` · ชั้น hook ต่อ domain ใน `src/data/*` (query + mutation + invalidate) · key factory `src/data/keys.js` · `src/lib/queryClient.js` (staleTime 30s, ล้าง cache ตอน `auth:logout`) · ทุกหน้าเลิก fetch ใน useEffect — ใช้ `useXxx()` hook · mutation invalidate ด้วย prefix (`["contracts"]` ฯลฯ) แทน `tick`/prop-drill `onSaved`/`onActioned`
 
 **Infra**
 - [x] frontend service อยู่ใน `eden-network` + `container_name` + `depends_on: backend (healthy)`

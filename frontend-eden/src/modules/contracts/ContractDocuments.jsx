@@ -1,6 +1,11 @@
-import { useEffect, useState } from "react";
-import { apiGet, apiPost, apiDelete, apiUpload, fileUrl } from "../../lib/api";
+import { useState } from "react";
+import { apiUpload, fileUrl } from "../../lib/api";
 import { formatDate } from "../../lib/datetime";
+import {
+  useTenantDocuments,
+  useAddTenantDocument,
+  useDeleteDocument,
+} from "../../data/documents";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
 const DOC_TYPES = [
@@ -17,65 +22,36 @@ const inputCls =
 // section เอกสารแนบ — เอกสารเป็นของผู้เช่า (ใช้ร่วมกับสัญญาอื่นของผู้เช่ารายเดียวกัน)
 // readOnly = ดูอย่างเดียว (หน้าประวัติ) — ซ่อนปุ่มเพิ่ม/ลบ
 function ContractDocuments({ tenantId, readOnly = false }) {
-  const [rows, setRows] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [tick, setTick] = useState(0);
-  const reload = () => setTick((t) => t + 1);
+  const { data: rows = [], isPending: loading, error: loadError } =
+    useTenantDocuments(tenantId);
+  const addDocument = useAddTenantDocument();
+  const deleteDocument = useDeleteDocument();
 
   const [docType, setDocType] = useState(DOC_TYPES[0]);
-  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
   const [deleting, setDeleting] = useState(null);
-  const [deleteBusy, setDeleteBusy] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      try {
-        const data = await apiGet(`/tenants/${tenantId}/documents`);
-        if (!cancelled) {
-          setRows(data);
-          setError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setError(e.message);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [tenantId, tick]);
+  const uploading = addDocument.isPending;
 
   async function handlePick(file) {
-    setUploading(true);
     setError(null);
     try {
       const { url } = await apiUpload(file);
-      await apiPost(`/tenants/${tenantId}/documents`, {
-        doc_type: docType,
-        file_url: url,
+      await addDocument.mutateAsync({
+        tenantId,
+        body: { doc_type: docType, file_url: url },
       });
-      reload();
     } catch (e) {
       setError(`เพิ่มเอกสารไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setUploading(false);
     }
   }
 
   async function handleDelete() {
-    setDeleteBusy(true);
     try {
-      await apiDelete(`/documents/${deleting.doc_id}`);
+      await deleteDocument.mutateAsync({ tenantId, docId: deleting.doc_id });
       setDeleting(null);
-      reload();
     } catch (e) {
       alert(`ลบไม่สำเร็จ: ${e.message}`);
-    } finally {
-      setDeleteBusy(false);
     }
   }
 
@@ -88,9 +64,9 @@ function ContractDocuments({ tenantId, readOnly = false }) {
         </p>
       </div>
 
-      {error && (
+      {(error || loadError) && (
         <div className="bg-red-50 text-red-700 text-sm rounded px-3 py-2">
-          {error}
+          {error ?? loadError.message}
         </div>
       )}
 
@@ -165,7 +141,7 @@ function ContractDocuments({ tenantId, readOnly = false }) {
           message={`ลบเอกสาร "${deleting.doc_type}" ใช่หรือไม่? การลบไม่สามารถย้อนกลับได้`}
           confirmText="ลบ"
           danger
-          busy={deleteBusy}
+          busy={deleteDocument.isPending}
           onConfirm={handleDelete}
           onClose={() => setDeleting(null)}
         />
