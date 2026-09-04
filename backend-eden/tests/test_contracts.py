@@ -236,6 +236,19 @@ def test_run_expire_only_active_past_end_date(client, auth_client, db):
     assert statuses == ["active", "draft", "expired"]
 
 
+def test_expire_contracts_script(db):
+    from expire_contracts import run
+
+    past = TODAY - datetime.timedelta(days=1)
+    make_contract(db, room_id=None, status=models.ContractStatus.active, end_date=past)
+    make_contract(db, room_id=None, status=models.ContractStatus.draft, end_date=past)
+
+    assert run(db) == 1
+    assert run(db) == 0  # idempotent
+    statuses = sorted(c.status.value for c in db.query(models.Contracts).all())
+    assert statuses == ["draft", "expired"]
+
+
 # ── PUT / DELETE ─────────────────────────────────────────────────────────────
 def test_put_terminate_is_admin_only(client, auth_client, db):
     auth_client(models.Role.staff)
