@@ -1,5 +1,5 @@
-"""characterization: /contract-requests/* workflow — create, list (row-filtered),
-PATCH transitions, DELETE. lock พฤติกรรมปัจจุบันรวม bug ที่จะแก้ทีหลัง (`# QUIRK`)
+"""/contract-requests/* workflow — create, list (row-filtered), PATCH transitions
+(state machine + renew ขยาย end_date + terminate set status/damage), DELETE
 """
 
 import datetime
@@ -209,69 +209,135 @@ def test_complete_terminate_needs_checkout_checklist(client, auth_client, db):
     assert res.status_code == 200
 
 
-def test_complete_renew_does_not_extend_contract(client, auth_client, db):
+def test_complete_renew_extends_end_date(client, auth_client, db):
     auth_client(models.Role.staff)
-    c = make_contract(db, room_id=None, end_date=datetime.date(2026, 12, 31))
-    r = _req(
+    c = make_contract(
         db,
-        c,
-        rtype=models.RequestType.renew,
-        preferred_date=datetime.date(2027, 12, 31),
+        room_id=None,
+        status=models.ContractStatus.active,
+        end_date=datetime.date(2026, 12, 31),
     )
+    r = _req(db, c, rtype=models.RequestType.renew)
 
-    client.patch(
+    # ไม่ส่ง preferred_date + req ไม่มี → 400
+    res = client.patch(
+        f"/contract-requests/{r.request_id}", json={"status": "completed"}
+    )
+    assert res.status_code == 400
+    assert res.json()["detail"] == "ต้องระบุวันสิ้นสุดใหม่"
+
+    # วันก่อน end เดิม → 400
+    res = client.patch(
+        f"/contract-requests/{r.request_id}",
+        json={"status": "completed", "preferred_date": "2026-06-01"},
+    )
+    assert res.status_code == 400
+
+    # วันหลัง end เดิม → ขยายสัญญา
+    res = client.patch(
         f"/contract-requests/{r.request_id}",
         json={"status": "completed", "preferred_date": "2027-12-31"},
     )
+    assert res.status_code == 200
     db.refresh(c)
-    # QUIRK: complete renew ไม่ขยาย end_date — ต้อง PUT /contracts เองแยก
-    assert c.end_date == datetime.date(2026, 12, 31)
+    assert c.end_date == datetime.date(2027, 12, 31)
 
 
-def test_complete_terminate_does_not_change_contract_or_damage(client, auth_client, db):
+def test_complete_terminate_sets_status_and_sums_damage(client, auth_client, db):
     auth_client(models.Role.staff)
     c = make_contract(db, room_id=None, status=models.ContractStatus.active)
-    # checkout checklist ใส่ตรง ๆ (เลี่ยง side effect ของ route ที่จะ flip status)
     db.add(
         models.ContractChecklist(
-            contract_id=c.contract_id, type=models.ChecklistType.check_out
+            contract_id=c.contract_id,
+            type=models.ChecklistType.check_out,
+            checklist_items=[
+                {"name": "แอร์", "cost": 300},
+                {"name": "พื้น", "cost": 200},
+                {"name": "ผนัง", "cost": 0},
+            ],
         )
     )
     r = _req(db, c, rtype=models.RequestType.terminate)
     db.commit()
 
-    client.patch(f"/contract-requests/{r.request_id}", json={"status": "completed"})
+    res = client.patch(
+        f"/contract-requests/{r.request_id}", json={"status": "completed"}
+    )
+    assert res.status_code == 200
     db.refresh(c)
     db.refresh(r)
-    # QUIRK: complete terminate ไม่แตะ Contracts.status, ไม่คิด damage_total
-    assert c.status == models.ContractStatus.active
-    assert r.damage_total is None
+    assert c.status == models.ContractStatus.terminated
+    assert r.damage_total is not None and float(r.damage_total) == 500
 
 
-def test_patch_has_no_state_machine(client, auth_client, db):
+def test_complete_terminate_damage_total_override(client, auth_client, db):
     auth_client(models.Role.staff)
-    r = _req(db, make_contract(db, room_id=None), status=models.RequestStatus.completed)
-    # QUIRK: completed → pending ได้ (ไม่มีการตรวจ transition)
+    c = make_contract(db, room_id=None, status=models.ContractStatus.active)
+    db.add(
+        models.ContractChecklist(
+            contract_id=c.contract_id,
+            type=models.ChecklistType.check_out,
+            checklist_items=[{"name": "แอร์", "cost": 300}],
+        )
+    )
+    r = _req(db, c, rtype=models.RequestType.terminate)
+    db.commit()
+
+    client.patch(
+        f"/contract-requests/{r.request_id}",
+        json={"status": "completed", "damage_total": 999},
+    )
+    db.refresh(r)
+    assert r.damage_total is not None and float(r.damage_total) == 999  # override
+
+
+def test_patch_state_machine(client, auth_client, db):
+    auth_client(models.Role.staff)
+    c = make_contract(db, room_id=None, status=models.ContractStatus.active)
+
+    r = _req(db, c, rtype=models.RequestType.renew)
+    assert (
+        client.patch(
+            f"/contract-requests/{r.request_id}", json={"status": "accepted"}
+        ).status_code
+        == 200
+    )
+    assert (
+        client.patch(
+            f"/contract-requests/{r.request_id}",
+            json={"status": "completed", "preferred_date": "2027-12-31"},
+        ).status_code
+        == 200
+    )
+    # completed = terminal
     res = client.patch(f"/contract-requests/{r.request_id}", json={"status": "pending"})
-    assert res.status_code == 200
-    assert res.json()["status"] == "pending"
+    assert res.status_code == 400
+
+    r2 = _req(db, c, status=models.RequestStatus.rejected)
+    assert (
+        client.patch(
+            f"/contract-requests/{r2.request_id}", json={"status": "accepted"}
+        ).status_code
+        == 400
+    )
 
 
-def test_handled_by_set_only_on_first_exit_from_pending(client, auth_client, db):
+def test_handled_by_updates_each_transition(client, auth_client, db):
     s1 = auth_client(models.Role.staff)
-    r = _req(db, make_contract(db, room_id=None))
+    c = make_contract(db, room_id=None, status=models.ContractStatus.active)
+    r = _req(db, c, rtype=models.RequestType.renew)
 
     client.patch(f"/contract-requests/{r.request_id}", json={"status": "accepted"})
     db.refresh(r)
     assert r.handled_by == s1.user_id
-    assert r.handled_at is not None
 
     s2 = auth_client(models.Role.staff)
-    client.patch(f"/contract-requests/{r.request_id}", json={"status": "completed"})
+    client.patch(
+        f"/contract-requests/{r.request_id}",
+        json={"status": "completed", "preferred_date": "2027-12-31"},
+    )
     db.refresh(r)
-    # ไม่อัปเดตซ้ำ — ยังเป็น s1
-    assert r.handled_by == s1.user_id
-    assert s2.user_id != s1.user_id
+    assert r.handled_by == s2.user_id and s2.user_id != s1.user_id
 
 
 # ── DELETE ───────────────────────────────────────────────────────────────────

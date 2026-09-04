@@ -11,6 +11,21 @@ _OPEN_STATUSES = (
     models.RequestStatus.accepted.value,
 )
 
+# state machine (lenient) — completed/rejected = terminal
+_NEXT = {
+    models.RequestStatus.pending: {
+        models.RequestStatus.accepted,
+        models.RequestStatus.rejected,
+        models.RequestStatus.completed,
+    },
+    models.RequestStatus.accepted: {
+        models.RequestStatus.rejected,
+        models.RequestStatus.completed,
+    },
+    models.RequestStatus.rejected: set(),
+    models.RequestStatus.completed: set(),
+}
+
 
 def _row_to_dict(
     req: models.ContractRequest, tenant_name: str, room_id, end_date, deposit
@@ -118,6 +133,19 @@ def get_request(db: Session, request_id: int) -> models.ContractRequest | None:
     )
 
 
+def _sum_checkout_damage(contract: models.Contracts) -> float:
+    checkouts = [
+        c
+        for c in contract.contract_checklists
+        if c.type == models.ChecklistType.check_out
+    ]
+    if not checkouts:
+        raise ValueError("ต้องบันทึกผลตรวจสภาพห้องออกก่อน")
+    latest = max(checkouts, key=lambda c: c.cc_id)
+    items = latest.checklist_items or []
+    return sum(float(it.get("cost") or 0) for it in items)
+
+
 def update_request(
     db: Session, request_id: int, data: schemas.ContractRequestUpdate, handled_by: int
 ) -> models.ContractRequest | None:
@@ -126,17 +154,37 @@ def update_request(
         return None
 
     changes = data.model_dump(exclude_unset=True)
-    was_pending = req.status == models.RequestStatus.pending
+    new_status = changes.get("status")
+
+    if new_status is not None and new_status != req.status:
+        if new_status not in _NEXT[req.status]:
+            raise ValueError(
+                f"เปลี่ยนสถานะจาก {req.status.value} เป็น {new_status.value} ไม่ได้"
+            )
+
+    contract = db.get(models.Contracts, req.contract_id)
+    if contract is None:
+        raise ValueError("ไม่พบสัญญาของคำขอนี้")
+
+    # ปิดคำขอ → ลงมือกับสัญญาจริง
+    if new_status == models.RequestStatus.completed and req.status != new_status:
+        if req.request_type == models.RequestType.renew:
+            new_end = changes.get("preferred_date") or req.preferred_date
+            if new_end is None:
+                raise ValueError("ต้องระบุวันสิ้นสุดใหม่")
+            if new_end <= contract.end_date:
+                raise ValueError("วันสิ้นสุดใหม่ต้องหลังวันสิ้นสุดเดิม")
+            contract.end_date = new_end
+        else:  # terminate
+            damage = _sum_checkout_damage(contract)
+            changes.setdefault("damage_total", damage)
+            contract.status = models.ContractStatus.terminated
 
     for field, value in changes.items():
         setattr(req, field, value)
 
-    # เริ่มดำเนินการ → บันทึกผู้รับเรื่อง + เวลา
-    if (
-        "status" in changes
-        and was_pending
-        and req.status != models.RequestStatus.pending
-    ):
+    # เปลี่ยนสถานะออกจาก pending → บันทึกผู้ดำเนินการล่าสุด + เวลา
+    if new_status is not None and new_status != models.RequestStatus.pending:
         req.handled_by = handled_by
         req.handled_at = func.now()
 

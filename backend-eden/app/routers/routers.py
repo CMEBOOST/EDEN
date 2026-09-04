@@ -662,22 +662,15 @@ def update_request_route(
     db: Session = Depends(get_db),
     me: models.Users = Depends(require_staff),
 ):
-    req = request_crud.get_request(db=db, request_id=request_id)
+    try:
+        req = request_crud.update_request(
+            db=db, request_id=request_id, data=data, handled_by=me.user_id
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     if req is None:
         raise HTTPException(status_code=404, detail="ไม่พบคำแจ้งความจำนง")
-
-    # ปิดงานยุติสัญญา ต้องบันทึกผลตรวจสภาพห้องออกก่อน
-    if (
-        data.status == RequestStatus.completed
-        and req.request_type == models.RequestType.terminate
-    ):
-        checklists = checklist_crud.get_checklists(db=db, contract_id=req.contract_id)
-        if not any(c.type == ChecklistType.check_out for c in checklists):
-            raise HTTPException(status_code=400, detail="ต้องบันทึกผลตรวจสภาพห้องออกก่อน")
-
-    return request_crud.update_request(
-        db=db, request_id=request_id, data=data, handled_by=me.user_id
-    )
+    return req
 
 
 @request_router.delete("/{request_id}")

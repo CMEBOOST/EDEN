@@ -1,5 +1,5 @@
-"""characterization: /contracts/* — create (atomic), list + "finished" quirk,
-run-expire, PUT/DELETE. lock พฤติกรรมปัจจุบันรวม bug ที่จะแก้ทีหลัง (`# QUIRK`)
+"""characterization: /contracts/* — create (atomic), list + finished filter,
+run-expire, PUT/DELETE checklist side effects
 """
 
 import datetime
@@ -260,12 +260,11 @@ def test_put_can_edit_terminated_contract(client, auth_client, db):
     assert float(c.rent) == 9999
 
 
-def test_checkout_checklist_by_staff_bypasses_admin_terminate_rule(
-    client, auth_client, db
-):
+def test_checkout_checklist_by_staff_terminates_contract(client, auth_client, db):
     auth_client(models.Role.staff)
     c = make_contract(db, room_id=None, status=models.ContractStatus.active)
-    # QUIRK: staff โพสต์ check-out checklist → contract terminated (ข้ามกฎ admin-only ของ PUT)
+    # ตั้งใจ: check-out = สิ้นสุดกระบวนการเช่า → staff ยุติได้เลย ไม่ต้องรอ admin
+    # (ต่างจาก PUT /contracts status=terminated ที่จำกัด admin)
     res = client.post(
         f"/contracts/{c.contract_id}/checklists",
         json={"type": "check-out", "items": []},

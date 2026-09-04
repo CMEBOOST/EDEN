@@ -38,7 +38,8 @@ def test_items_store_cost_photos_flattened(client, auth_client, db):
         },
     )
     body = res.json()
-    # QUIRK: cost ถูกเก็บใน checklist_items แต่ backend ไม่เคยรวมคำนวณ
+    # cost เก็บใน checklist_items — รวมเป็น damage_total ตอนปิด request terminate
+    # (ดู test_requests.py::test_complete_terminate_sets_status_and_sums_damage)
     assert body["checklist_items"][0]["cost"] == 500
     assert body["photo_urls"] == ["/uploads/a.png", "/uploads/b.png", "/uploads/c.png"]
 
