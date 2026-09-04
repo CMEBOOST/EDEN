@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useTenants, useCreateTenant, useUpdateTenant } from "../../data/tenants";
+import {
+  useTenants,
+  useCreateTenant,
+  useUpdateTenant,
+} from "../../data/tenants";
 import { useUsers } from "../../data/users";
 
 const EMPTY = {
@@ -68,8 +72,7 @@ function TenantForm({ tenant, onClose }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const set = (key) => (e) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
   async function handleSubmit(e) {
     e.preventDefault();

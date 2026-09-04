@@ -49,9 +49,7 @@ def login_route(
 ):
     user = user_crud.get_user_by_username(db, form.username)
     if user is None or not verify_password(form.password, user.password_hash):
-        raise HTTPException(
-            status_code=401, detail="username หรือรหัสผ่านไม่ถูกต้อง"
-        )
+        raise HTTPException(status_code=401, detail="username หรือรหัสผ่านไม่ถูกต้อง")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="บัญชีนี้ถูกปิดการใช้งาน")
     audit_crud.write(db, user.user_id, "เข้าสู่ระบบ")
@@ -135,9 +133,7 @@ def update_user_route(
         raise HTTPException(status_code=400, detail="ไม่มีข้อมูลที่จะแก้ไข")
 
     if "is_active" in fields and user_id == me.user_id:
-        raise HTTPException(
-            status_code=400, detail="เปิด/ปิดการใช้งานบัญชีตัวเองไม่ได้"
-        )
+        raise HTTPException(status_code=400, detail="เปิด/ปิดการใช้งานบัญชีตัวเองไม่ได้")
     if "username" in fields:
         dup = user_crud.get_user_by_username(db, fields["username"])
         if dup is not None and dup.user_id != user_id:
@@ -158,9 +154,7 @@ def set_password_route(
     user_id: int, data: schemas.PasswordSet, db: Session = Depends(get_db)
 ):
     if len(data.new_password) < 6:
-        raise HTTPException(
-            status_code=400, detail="รหัสผ่านสั้นเกินไป (อย่างน้อย 6 ตัว)"
-        )
+        raise HTTPException(status_code=400, detail="รหัสผ่านสั้นเกินไป (อย่างน้อย 6 ตัว)")
     user = user_crud.set_password(db, user_id, data.new_password)
     if user is None:
         raise HTTPException(status_code=404, detail="ไม่พบผู้ใช้")
@@ -191,20 +185,14 @@ def create_tenant_route(tenant: schemas.Tenants, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="ไม่พบ user_id นี้")
     role = user.role.value if hasattr(user.role, "value") else user.role
     if role != "tenant":
-        raise HTTPException(
-            status_code=400, detail='บัญชีผู้ใช้ต้องเป็น role "ผู้เช่า" (tenant)'
-        )
+        raise HTTPException(status_code=400, detail='บัญชีผู้ใช้ต้องเป็น role "ผู้เช่า" (tenant)')
     if tenent_crud.get_tenant_by_user(db=db, user_id=tenant.user_id) is not None:
-        raise HTTPException(
-            status_code=409, detail="บัญชีนี้ลงทะเบียนผู้เช่าไว้แล้ว"
-        )
+        raise HTTPException(status_code=409, detail="บัญชีนี้ลงทะเบียนผู้เช่าไว้แล้ว")
     try:
         return tenent_crud.create_tenant(db=db, tenant=tenant)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=409, detail="บัญชีนี้ลงทะเบียนผู้เช่าไว้แล้ว"
-        )
+        raise HTTPException(status_code=409, detail="บัญชีนี้ลงทะเบียนผู้เช่าไว้แล้ว")
 
 
 @tenant_router.get("/", response_model=list[schemas.TenantSummary])
@@ -220,7 +208,9 @@ def get_tenant_route(tenant_id: int, db: Session = Depends(get_db)):
     return tenant
 
 
-@tenant_router.put("/{tenant_id}", response_model=schemas.TenantOut, dependencies=_staff)
+@tenant_router.put(
+    "/{tenant_id}", response_model=schemas.TenantOut, dependencies=_staff
+)
 def update_tenant_route(
     tenant_id: int, data: schemas.TenantUpdate, db: Session = Depends(get_db)
 ):
@@ -277,7 +267,9 @@ def delete_document_route(doc_id: int, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # Contracts
 # ---------------------------------------------------------------------------
-contract_router = APIRouter(prefix="/contracts", tags=["Contracts"], dependencies=_staff)
+contract_router = APIRouter(
+    prefix="/contracts", tags=["Contracts"], dependencies=_staff
+)
 
 
 @contract_router.post("/", dependencies=_staff)
@@ -329,9 +321,7 @@ def create_contract_route(
         db.refresh(new_contract)
     except IntegrityError:
         db.rollback()
-        raise HTTPException(
-            status_code=409, detail="ข้อมูลขัดแย้ง (เช่น ห้องถูกใช้ไปแล้ว)"
-        )
+        raise HTTPException(status_code=409, detail="ข้อมูลขัดแย้ง (เช่น ห้องถูกใช้ไปแล้ว)")
     return new_contract
 
 
@@ -461,9 +451,7 @@ def update_checklist_route(
 
 
 @contract_router.delete("/{contract_id}/checklists/{cc_id}", dependencies=_staff)
-def delete_checklist_route(
-    contract_id: int, cc_id: int, db: Session = Depends(get_db)
-):
+def delete_checklist_route(contract_id: int, cc_id: int, db: Session = Depends(get_db)):
     existing = checklist_crud.get_checklist(db=db, cc_id=cc_id)
     if existing is None or existing.contract_id != contract_id:
         raise HTTPException(status_code=404, detail="ไม่พบบันทึกสภาพห้อง")
@@ -528,8 +516,7 @@ def current_rates_route(
     """อัตราที่มีผล ณ วันที่ที่ระบุ (ไม่ระบุ = วันนี้) แยกตามประเภท"""
     on_date = date or datetime.date.today()
     return {
-        t.value: rate_crud.get_effective_rate(db, t.value, on_date)
-        for t in RateType
+        t.value: rate_crud.get_effective_rate(db, t.value, on_date) for t in RateType
     }
 
 
@@ -620,9 +607,7 @@ def create_request_route(
             )
 
     if request_crud.has_open_request(db=db, contract_id=data.contract_id) is not None:
-        raise HTTPException(
-            status_code=409, detail="มีคำแจ้งความจำนงที่ยังไม่ดำเนินการอยู่แล้ว"
-        )
+        raise HTTPException(status_code=409, detail="มีคำแจ้งความจำนงที่ยังไม่ดำเนินการอยู่แล้ว")
 
     return request_crud.create_request(db=db, data=data, created_by=me.user_id)
 
@@ -680,9 +665,7 @@ def update_request_route(
     ):
         checklists = checklist_crud.get_checklists(db=db, contract_id=req.contract_id)
         if not any(c.type == ChecklistType.check_out for c in checklists):
-            raise HTTPException(
-                status_code=400, detail="ต้องบันทึกผลตรวจสภาพห้องออกก่อน"
-            )
+            raise HTTPException(status_code=400, detail="ต้องบันทึกผลตรวจสภาพห้องออกก่อน")
 
     return request_crud.update_request(
         db=db, request_id=request_id, data=data, handled_by=me.user_id
@@ -774,9 +757,7 @@ def change_password_route(
     if not verify_password(data.current_password, me.password_hash):
         raise HTTPException(status_code=400, detail="รหัสผ่านเดิมไม่ถูกต้อง")
     if len(data.new_password) < 6:
-        raise HTTPException(
-            status_code=400, detail="รหัสผ่านใหม่สั้นเกินไป (อย่างน้อย 6 ตัว)"
-        )
+        raise HTTPException(status_code=400, detail="รหัสผ่านใหม่สั้นเกินไป (อย่างน้อย 6 ตัว)")
     user_crud.set_password(db, me.user_id, data.new_password)
     return {"ok": True}
 
@@ -795,7 +776,9 @@ def update_profile_tenant_route(
         for k, v in data.model_dump(exclude_unset=True).items()
         if k not in _SENSITIVE_TENANT
     }
-    updated = tenent_crud.update_tenant(db=db, tenant_id=tenant.tenant_id, fields=fields)
+    updated = tenent_crud.update_tenant(
+        db=db, tenant_id=tenant.tenant_id, fields=fields
+    )
     if updated is None:
         raise HTTPException(status_code=404, detail="ไม่พบผู้เช่า")
     return _tenant_public(updated)
@@ -804,7 +787,9 @@ def update_profile_tenant_route(
 # ---------------------------------------------------------------------------
 # Dashboard (แตกข้อมูลตาม role)
 # ---------------------------------------------------------------------------
-dashboard_router = APIRouter(prefix="/dashboard", tags=["Dashboard"], dependencies=_auth)
+dashboard_router = APIRouter(
+    prefix="/dashboard", tags=["Dashboard"], dependencies=_auth
+)
 
 
 @dashboard_router.get("/")

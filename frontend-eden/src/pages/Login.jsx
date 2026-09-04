@@ -22,7 +22,9 @@ function Login() {
       await login(form.username.trim(), form.password);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err.status === 401 ? "username หรือรหัสผ่านไม่ถูกต้อง" : err.message);
+      setError(
+        err.status === 401 ? "username หรือรหัสผ่านไม่ถูกต้อง" : err.message
+      );
     } finally {
       setBusy(false);
     }

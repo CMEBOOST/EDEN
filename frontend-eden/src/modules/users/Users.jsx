@@ -182,9 +182,7 @@ function Users() {
                       <button
                         disabled={disabled}
                         onClick={() =>
-                          u.is_active
-                            ? setDeactivating(u)
-                            : setActive(u, true)
+                          u.is_active ? setDeactivating(u) : setActive(u, true)
                         }
                         className={`px-2.5 py-1 rounded-full text-xs font-medium disabled:opacity-40 ${
                           u.is_active

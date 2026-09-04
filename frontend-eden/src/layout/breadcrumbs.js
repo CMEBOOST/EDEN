@@ -6,11 +6,29 @@ const RULES = [
   [/^\/menu$/, [["เมนู", null]]],
 
   [/^\/tenants$/, [["ผู้เช่า", null]]],
-  [/^\/tenants\/[^/]+$/, [["ผู้เช่า", "/tenants"], ["รายละเอียด", null]]],
+  [
+    /^\/tenants\/[^/]+$/,
+    [
+      ["ผู้เช่า", "/tenants"],
+      ["รายละเอียด", null],
+    ],
+  ],
 
   [/^\/contracts$/, [["สัญญาเช่า", null]]],
-  [/^\/contracts\/new$/, [["สัญญาเช่า", "/contracts"], ["สร้างสัญญา", null]]],
-  [/^\/contracts\/history$/, [["สัญญาเช่า", "/contracts"], ["ประวัติ", null]]],
+  [
+    /^\/contracts\/new$/,
+    [
+      ["สัญญาเช่า", "/contracts"],
+      ["สร้างสัญญา", null],
+    ],
+  ],
+  [
+    /^\/contracts\/history$/,
+    [
+      ["สัญญาเช่า", "/contracts"],
+      ["ประวัติ", null],
+    ],
+  ],
   [
     /^\/contracts\/history\/[^/]+$/,
     [
@@ -21,9 +39,18 @@ const RULES = [
   ],
   [
     /^\/contracts\/[^/]+\/checkout$/,
-    [["สัญญาเช่า", "/contracts"], ["ตรวจสภาพห้องออก", null]],
+    [
+      ["สัญญาเช่า", "/contracts"],
+      ["ตรวจสภาพห้องออก", null],
+    ],
   ],
-  [/^\/contracts\/[^/]+$/, [["สัญญาเช่า", "/contracts"], ["รายละเอียด", null]]],
+  [
+    /^\/contracts\/[^/]+$/,
+    [
+      ["สัญญาเช่า", "/contracts"],
+      ["รายละเอียด", null],
+    ],
+  ],
 
   [/^\/rate$/, [["อัตราค่าบริการ", null]]],
   [/^\/users$/, [["จัดการผู้ใช้", null]]],

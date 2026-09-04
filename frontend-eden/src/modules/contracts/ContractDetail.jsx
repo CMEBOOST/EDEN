@@ -71,7 +71,9 @@ function ContractDetail({ readOnly = false }) {
         >
           ← กลับ
         </button>
-        <h2 className="text-2xl font-semibold">สัญญา #{contract.contract_id}</h2>
+        <h2 className="text-2xl font-semibold">
+          สัญญา #{contract.contract_id}
+        </h2>
         {readOnly && (
           <span className="inline-block px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
             ประวัติ · อ่านอย่างเดียว

@@ -31,7 +31,9 @@ function TenantContractsSection({ contracts }) {
                 <th className="px-4 py-2 font-medium">ห้อง</th>
                 <th className="px-4 py-2 font-medium">เริ่ม</th>
                 <th className="px-4 py-2 font-medium">สิ้นสุด</th>
-                <th className="px-4 py-2 font-medium text-right">ค่าเช่า/เดือน</th>
+                <th className="px-4 py-2 font-medium text-right">
+                  ค่าเช่า/เดือน
+                </th>
                 <th className="px-4 py-2 font-medium text-center">สถานะ</th>
               </tr>
             </thead>

@@ -41,7 +41,9 @@ function ConfirmDialog({
             onClick={onConfirm}
             disabled={busy}
             className={`px-4 py-2 text-sm rounded text-white disabled:opacity-50 ${
-              danger ? "bg-red-600 hover:bg-red-700" : "bg-blue-500 hover:bg-blue-600"
+              danger
+                ? "bg-red-600 hover:bg-red-700"
+                : "bg-blue-500 hover:bg-blue-600"
             }`}
           >
             {busy ? "กำลังดำเนินการ..." : confirmText}

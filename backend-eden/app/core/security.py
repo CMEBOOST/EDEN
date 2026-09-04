@@ -6,6 +6,7 @@
 
 รูปแบบเดียวกับ passlib `bcrypt_sha256` และ Django.
 """
+
 import base64
 import hashlib
 

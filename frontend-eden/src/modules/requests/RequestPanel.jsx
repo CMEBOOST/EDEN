@@ -97,16 +97,10 @@ function RequestPanel() {
       </div>
 
       {renewing && (
-        <RenewDialog
-          request={renewing}
-          onClose={() => setRenewing(null)}
-        />
+        <RenewDialog request={renewing} onClose={() => setRenewing(null)} />
       )}
       {rejecting && (
-        <RejectDialog
-          request={rejecting}
-          onClose={() => setRejecting(null)}
-        />
+        <RejectDialog request={rejecting} onClose={() => setRejecting(null)} />
       )}
     </div>
   );

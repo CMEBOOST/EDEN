@@ -26,18 +26,12 @@ def get_tenants(db: Session, skip: int = 0, limit: int = 10):
 
 def get_tenant(db: Session, tenant_id: int):
     return (
-        db.query(models.Tenants)
-        .filter(models.Tenants.tenant_id == tenant_id)
-        .first()
+        db.query(models.Tenants).filter(models.Tenants.tenant_id == tenant_id).first()
     )
 
 
 def get_tenant_by_user(db: Session, user_id: int):
-    return (
-        db.query(models.Tenants)
-        .filter(models.Tenants.user_id == user_id)
-        .first()
-    )
+    return db.query(models.Tenants).filter(models.Tenants.user_id == user_id).first()
 
 
 def update_tenant(db: Session, tenant_id: int, fields: dict):

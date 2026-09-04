@@ -26,11 +26,7 @@ def get_user_by_id(db: Session, user_id: int):
 
 
 def get_user_by_username(db: Session, username: str):
-    return (
-        db.query(models.Users)
-        .filter(models.Users.username == username)
-        .first()
-    )
+    return db.query(models.Users).filter(models.Users.username == username).first()
 
 
 def set_role(db: Session, user_id: int, role):

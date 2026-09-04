@@ -127,15 +127,15 @@ function ContractInfoSection({ contract, readOnly = false }) {
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <Row label="ห้อง">{contract.room_id ?? "-"}</Row>
-            <Row label="สถานะ">{statusLabel[contract.status] ?? contract.status}</Row>
+            <Row label="สถานะ">
+              {statusLabel[contract.status] ?? contract.status}
+            </Row>
             <Row label="ค่าเช่า/เดือน">{fmtBaht(contract.rent)} ฿</Row>
             <Row label="วันเริ่มสัญญา">{formatDate(contract.start_date)}</Row>
             <Row label="วันสิ้นสุดสัญญา">{formatDate(contract.end_date)}</Row>
             <Row label="เงินประกัน">{fmtBaht(contract.security_deposit)} ฿</Row>
           </div>
-          <Row label="เงื่อนไขพิเศษ">
-            {contract.special_conditions || "-"}
-          </Row>
+          <Row label="เงื่อนไขพิเศษ">{contract.special_conditions || "-"}</Row>
           <Row label="ไฟล์สัญญา">
             {contract.contract_file_url ? (
               <a

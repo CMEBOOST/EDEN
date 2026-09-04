@@ -1,8 +1,9 @@
 """สร้าง user role=admin คนแรกของระบบ
 
-    uv run python create_admin.py                 # ถาม username/password
-    uv run python create_admin.py <user> <pass>   # หรือรับจาก argv
+uv run python create_admin.py                 # ถาม username/password
+uv run python create_admin.py <user> <pass>   # หรือรับจาก argv
 """
+
 import sys
 
 from app.database import SessionLocal
@@ -23,9 +24,7 @@ def main() -> None:
     db = SessionLocal()
     try:
         existing = (
-            db.query(models.Users)
-            .filter(models.Users.username == username)
-            .first()
+            db.query(models.Users).filter(models.Users.username == username).first()
         )
         if existing is not None:
             sys.exit(f"มี username '{username}' อยู่แล้ว (role={existing.role})")

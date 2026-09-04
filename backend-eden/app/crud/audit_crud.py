@@ -27,12 +27,7 @@ def get_logs(
     if q:
         query = query.filter(models.AuditLog.action.ilike(f"%{q}%"))
 
-    rows = (
-        query.order_by(models.AuditLog.log_id.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    rows = query.order_by(models.AuditLog.log_id.desc()).offset(skip).limit(limit).all()
     return [
         {
             "log_id": log.log_id,

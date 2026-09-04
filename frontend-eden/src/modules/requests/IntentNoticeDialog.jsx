@@ -114,7 +114,8 @@ function IntentNoticeDialog({ contractId, onClose }) {
 
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-gray-600">
-              รายละเอียด (ลายลักษณ์อักษร) <span className="text-red-500">*</span>
+              รายละเอียด (ลายลักษณ์อักษร){" "}
+              <span className="text-red-500">*</span>
             </span>
             <textarea
               rows={3}

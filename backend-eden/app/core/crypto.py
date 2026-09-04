@@ -8,6 +8,7 @@ Key มาจาก env `FIELD_ENCRYPTION_KEY` (Fernet key) — ถ้าไม�
 `SECRET_KEY` แบบ deterministic (พอสำหรับ dev · prod ควรตั้งแยกเพื่อไม่ให้การหมุน
 SECRET_KEY ทำให้ข้อมูลเดิมอ่านไม่ออก)
 """
+
 import base64
 import hashlib
 import logging

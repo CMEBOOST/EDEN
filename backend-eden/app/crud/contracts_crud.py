@@ -49,8 +49,7 @@ def get_contracts(
         # "เสร็จสิ้น" = มี checklist ตรวจคืนห้อง (check-out) อย่างน้อย 1 ใบ
         has_checkout = exists().where(
             and_(
-                models.ContractChecklist.contract_id
-                == models.Contracts.contract_id,
+                models.ContractChecklist.contract_id == models.Contracts.contract_id,
                 models.ContractChecklist.type == models.ChecklistType.check_out,
             )
         )
@@ -99,9 +98,7 @@ def expire_overdue(db: Session) -> int:
             models.Contracts.status == models.ContractStatus.active,
             models.Contracts.end_date < datetime.date.today(),
         )
-        .update(
-            {"status": models.ContractStatus.expired}, synchronize_session=False
-        )
+        .update({"status": models.ContractStatus.expired}, synchronize_session=False)
     )
     db.commit()
     return n

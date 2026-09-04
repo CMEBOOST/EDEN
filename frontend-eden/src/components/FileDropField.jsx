@@ -94,7 +94,9 @@ function FileDropField({
       <span className="text-sm text-gray-600">
         คลิกเพื่อเลือกไฟล์ หรือ ลากไฟล์มาวาง
       </span>
-      <span className="text-xs text-gray-400">PDF หรือ รูปภาพ · ไม่เกิน 10 MB</span>
+      <span className="text-xs text-gray-400">
+        PDF หรือ รูปภาพ · ไม่เกิน 10 MB
+      </span>
       <input
         type="file"
         accept={accept}

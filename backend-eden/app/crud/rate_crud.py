@@ -36,9 +36,7 @@ def get_rates(db: Session, type_: str | None = None):
 
 def get_rate(db: Session, rate_id: int):
     return (
-        db.query(models.RateConfig)
-        .filter(models.RateConfig.rate_id == rate_id)
-        .first()
+        db.query(models.RateConfig).filter(models.RateConfig.rate_id == rate_id).first()
     )
 
 

@@ -1,4 +1,5 @@
 """CRUD สำหรับคำแจ้งความจำนงล่วงหน้า (ต่อสัญญา / ยุติสัญญา)"""
+
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -11,7 +12,9 @@ _OPEN_STATUSES = (
 )
 
 
-def _row_to_dict(req: models.ContractRequest, tenant_name: str, room_id, end_date, deposit) -> dict:
+def _row_to_dict(
+    req: models.ContractRequest, tenant_name: str, room_id, end_date, deposit
+) -> dict:
     return {
         "request_id": req.request_id,
         "contract_id": req.contract_id,
@@ -39,7 +42,10 @@ def _base_query(db: Session):
             models.Contracts.end_date,
             models.Contracts.security_deposit,
         )
-        .join(models.Contracts, models.ContractRequest.contract_id == models.Contracts.contract_id)
+        .join(
+            models.Contracts,
+            models.ContractRequest.contract_id == models.Contracts.contract_id,
+        )
         .join(models.Tenants, models.Contracts.tenant_id == models.Tenants.tenant_id)
     )
 
@@ -89,11 +95,15 @@ def get_requests(
         .limit(limit)
         .all()
     )
-    return [_row_to_dict(req, name, room, end, dep) for req, name, room, end, dep in rows]
+    return [
+        _row_to_dict(req, name, room, end, dep) for req, name, room, end, dep in rows
+    ]
 
 
 def get_request_row(db: Session, request_id: int) -> dict | None:
-    row = _base_query(db).filter(models.ContractRequest.request_id == request_id).first()
+    row = (
+        _base_query(db).filter(models.ContractRequest.request_id == request_id).first()
+    )
     if row is None:
         return None
     req, name, room, end, dep = row
@@ -122,7 +132,11 @@ def update_request(
         setattr(req, field, value)
 
     # เริ่มดำเนินการ → บันทึกผู้รับเรื่อง + เวลา
-    if "status" in changes and was_pending and req.status != models.RequestStatus.pending:
+    if (
+        "status" in changes
+        and was_pending
+        and req.status != models.RequestStatus.pending
+    ):
         req.handled_by = handled_by
         req.handled_at = func.now()
 
@@ -143,7 +157,10 @@ def delete_request(db: Session, request_id: int) -> models.ContractRequest | Non
 def latest_for_tenant(db: Session, tenant_id: int) -> models.ContractRequest | None:
     return (
         db.query(models.ContractRequest)
-        .join(models.Contracts, models.ContractRequest.contract_id == models.Contracts.contract_id)
+        .join(
+            models.Contracts,
+            models.ContractRequest.contract_id == models.Contracts.contract_id,
+        )
         .filter(models.Contracts.tenant_id == tenant_id)
         .order_by(models.ContractRequest.created_at.desc())
         .first()

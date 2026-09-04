@@ -57,8 +57,9 @@ function Contracts() {
     if (!q) return contracts;
     return contracts.filter(
       (c) =>
-        String(c.room_id ?? "").toLowerCase().includes(q) ||
-        tenantName(c.tenant_id).toLowerCase().includes(q)
+        String(c.room_id ?? "")
+          .toLowerCase()
+          .includes(q) || tenantName(c.tenant_id).toLowerCase().includes(q)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contracts, tenantsById, search]);
@@ -110,7 +111,9 @@ function Contracts() {
               <th className="px-4 py-3 font-medium">ผู้เช่า</th>
               <th className="px-4 py-3 font-medium">เริ่มสัญญา</th>
               <th className="px-4 py-3 font-medium">สิ้นสุดสัญญา</th>
-              <th className="px-4 py-3 font-medium text-right">ค่าเช่า/เดือน</th>
+              <th className="px-4 py-3 font-medium text-right">
+                ค่าเช่า/เดือน
+              </th>
               <th className="px-4 py-3 font-medium text-center">สถานะ</th>
               <th className="px-4 py-3 font-medium text-center">จัดการ</th>
             </tr>

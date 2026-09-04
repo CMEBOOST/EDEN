@@ -7,6 +7,7 @@ Create Date: 2026-09-02
 แปลงค่า national_id_encrypted ที่เป็น plaintext → Fernet token
 (schema ไม่เปลี่ยน — ยังเป็น VARCHAR(255)) · idempotent + reversible
 """
+
 from typing import Sequence, Union
 
 from alembic import op
@@ -24,9 +25,7 @@ _SELECT = sa.text(
     "SELECT tenant_id, national_id_encrypted FROM tenants "
     "WHERE national_id_encrypted IS NOT NULL"
 )
-_UPDATE = sa.text(
-    "UPDATE tenants SET national_id_encrypted = :v WHERE tenant_id = :id"
-)
+_UPDATE = sa.text("UPDATE tenants SET national_id_encrypted = :v WHERE tenant_id = :id")
 
 
 def upgrade() -> None:

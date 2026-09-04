@@ -47,11 +47,19 @@ services:
     build: ./backend-eden
     container_name: eden-backend
     restart: unless-stopped
+    # dev: hot reload — แก้ .py แล้ว uvicorn รีโหลดเอง (ไม่ต้อง restart container)
+    # migration ยังรันตอน container start เท่านั้น → migration ใหม่ยังต้อง `docker compose restart backend`
+    command:
+      - sh
+      - -c
+      - uv run alembic upgrade head && uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
       # ต่อ DB ผ่านชื่อ service ภายใน network (พอร์ตภายในคือ 5432)
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-admin123}@postgres:5432/${POSTGRES_DB:-EDEN_DB}
+      # Docker Desktop (Windows/Mac) — file event ไม่ propagate ผ่าน bind mount ต้อง poll
+      WATCHFILES_FORCE_POLLING: "true"
     # คีย์ลับ (SECRET_KEY ฯลฯ) อ่านจากไฟล์ตอน compose up — ไม่ถูกฝังใน image
     env_file:
       - path: ./backend-eden/.env

@@ -24,8 +24,11 @@ function CheckoutInspection() {
 
   const { data: contract = null, isPending: loadingContract } =
     useContract(contractId);
-  const { data: lists, isPending: loadingLists, error: loadError } =
-    useChecklists(contractId);
+  const {
+    data: lists,
+    isPending: loadingLists,
+    error: loadError,
+  } = useChecklists(contractId);
   const createChecklist = useCreateChecklist();
   const updateRequest = useUpdateRequest();
   const loading = loadingContract || loadingLists;
@@ -136,9 +139,7 @@ function CheckoutInspection() {
                 <span className={statusItemStyle[it.status] ?? "text-gray-500"}>
                   {it.status}
                 </span>
-                {it.note && (
-                  <span className="text-gray-400">— {it.note}</span>
-                )}
+                {it.note && <span className="text-gray-400">— {it.note}</span>}
                 {(it.photos ?? []).map((u) => (
                   <img
                     key={u}
@@ -214,7 +215,8 @@ function CheckoutInspection() {
             ✓ บันทึกผลตรวจสภาพห้องออก & ยุติสัญญาแล้ว
           </span>
           <p className="text-xs text-gray-500">
-            สัญญา #{contractId} ถูกตั้งสถานะเป็น "ยกเลิก" และย้ายไปหน้าประวัติสัญญาเช่าแล้ว
+            สัญญา #{contractId} ถูกตั้งสถานะเป็น "ยกเลิก"
+            และย้ายไปหน้าประวัติสัญญาเช่าแล้ว
           </p>
           <div>
             <button

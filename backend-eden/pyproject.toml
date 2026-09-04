@@ -14,3 +14,14 @@ dependencies = [
     "pyjwt>=2.13.0",
     "sqlalchemy>=2.0.51",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.6",
+]
+
+# formatter (black-compatible) — รัน `uv run ruff format` · เช็ค `uv run ruff format --check`
+# import sorting / lint เพิ่มได้ทีหลังด้วย `ruff check --select I` (ตอนนี้ pyright ทำ type/unused แล้ว)
+[tool.ruff]
+line-length = 88
+target-version = "py313"

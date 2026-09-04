@@ -6,7 +6,12 @@ import { useDashboard } from "../../data/dashboard";
 import { useCancelRequest } from "../../data/requests";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import IntentNoticeDialog from "../requests/IntentNoticeDialog";
-import { statusLabel, statusStyle, typeLabel, OPEN_STATUSES } from "../requests/requestMeta";
+import {
+  statusLabel,
+  statusStyle,
+  typeLabel,
+  OPEN_STATUSES,
+} from "../requests/requestMeta";
 
 const fmtBaht = (n) =>
   Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -75,7 +80,9 @@ function StaffAdminDashboard({ data }) {
             {expiring.map((e) => (
               <tr key={e.contract_id} className="bg-white">
                 <td className="px-4 py-2.5">{e.tenant_name}</td>
-                <td className="px-4 py-2.5 text-gray-500">{e.room_id ?? "-"}</td>
+                <td className="px-4 py-2.5 text-gray-500">
+                  {e.room_id ?? "-"}
+                </td>
                 <td className="px-4 py-2.5 text-gray-500">
                   {formatDate(e.end_date)}
                 </td>
@@ -175,13 +182,15 @@ function TenantDashboard({ data }) {
             <div>
               <div className="text-gray-500">ช่วงสัญญา</div>
               <div>
-                {formatDate(contract.start_date)} – {formatDate(contract.end_date)}
+                {formatDate(contract.start_date)} –{" "}
+                {formatDate(contract.end_date)}
               </div>
             </div>
             <div>
               <div className="text-gray-500">ค่าเช่า / เงินประกัน</div>
               <div>
-                {fmtBaht(contract.rent)} / {fmtBaht(contract.security_deposit)} ฿
+                {fmtBaht(contract.rent)} / {fmtBaht(contract.security_deposit)}{" "}
+                ฿
               </div>
             </div>
           </div>

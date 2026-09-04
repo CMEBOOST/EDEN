@@ -67,8 +67,8 @@ class RequestType(str, enum.Enum):
 
 
 class RequestStatus(str, enum.Enum):
-    pending = "pending"      # ผู้เช่าแจ้ง ยังไม่มีใครรับเรื่อง
-    accepted = "accepted"    # staff/admin รับเรื่อง กำลังดำเนินการ
+    pending = "pending"  # ผู้เช่าแจ้ง ยังไม่มีใครรับเรื่อง
+    accepted = "accepted"  # staff/admin รับเรื่อง กำลังดำเนินการ
     rejected = "rejected"
     completed = "completed"  # ต่อสัญญาแล้ว / ตรวจสภาพห้องออกเสร็จ
 
@@ -98,16 +98,26 @@ class Users(TimestampMixin, Base):
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     password_hash: Mapped[str] = mapped_column(String(255))
     role: Mapped[Role] = mapped_column(_enum_col(Role, "role_enum"))
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, server_default="true"
+    )
     # null | "admin"/"male"/"female" (พรีเซ็ต) | "/uploads/<file>" (อัปโหลด)
     avatar_url: Mapped[str | None] = mapped_column(String(500))
 
     # ความสัมพันธ์
     tenants: Mapped[list["Tenants"]] = relationship(back_populates="user")
-    rate_configs: Mapped[list["RateConfig"]] = relationship(back_populates="created_by_user")
-    contracts_created: Mapped[list["Contracts"]] = relationship(back_populates="created_by_user")
-    documents_uploaded: Mapped[list["TenantDocument"]] = relationship(back_populates="uploaded_by_user")
-    checklists_created: Mapped[list["ContractChecklist"]] = relationship(back_populates="created_by_user")
+    rate_configs: Mapped[list["RateConfig"]] = relationship(
+        back_populates="created_by_user"
+    )
+    contracts_created: Mapped[list["Contracts"]] = relationship(
+        back_populates="created_by_user"
+    )
+    documents_uploaded: Mapped[list["TenantDocument"]] = relationship(
+        back_populates="uploaded_by_user"
+    )
+    checklists_created: Mapped[list["ContractChecklist"]] = relationship(
+        back_populates="created_by_user"
+    )
     audit_logs: Mapped[list["AuditLog"]] = relationship(back_populates="user")
 
 
@@ -132,7 +142,9 @@ class Tenants(TimestampMixin, Base):
     emergency_contact: Mapped[str | None] = mapped_column(String(255))
     last_login_at: Mapped[datetime.datetime | None] = mapped_column(Timestamp)
 
-    tenant_documents: Mapped[list["TenantDocument"]] = relationship(back_populates="tenant")
+    tenant_documents: Mapped[list["TenantDocument"]] = relationship(
+        back_populates="tenant"
+    )
     contracts: Mapped[list["Contracts"]] = relationship(back_populates="tenant")
 
 
@@ -150,8 +162,12 @@ class TenantDocument(TimestampMixin, Base):
     doc_type: Mapped[str] = mapped_column(String(50))
     file_url: Mapped[str] = mapped_column(String(500))
 
-    uploaded_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
-    uploaded_by_user: Mapped["Users | None"] = relationship(back_populates="documents_uploaded")
+    uploaded_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id"), index=True
+    )
+    uploaded_by_user: Mapped["Users | None"] = relationship(
+        back_populates="documents_uploaded"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -211,8 +227,12 @@ class Contracts(TimestampMixin, Base):
         default=ContractStatus.draft,
     )
 
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
-    created_by_user: Mapped["Users | None"] = relationship(back_populates="contracts_created")
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id"), index=True
+    )
+    created_by_user: Mapped["Users | None"] = relationship(
+        back_populates="contracts_created"
+    )
 
     # ลบสัญญา = ลบ checklist / คำแจ้งความจำนงของสัญญานั้นตามไปด้วย (hard delete, admin เท่านั้น)
     contract_checklists: Mapped[list["ContractChecklist"]] = relationship(
@@ -231,16 +251,24 @@ class ContractChecklist(TimestampMixin, Base):
 
     cc_id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
-    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.contract_id"), index=True)
+    contract_id: Mapped[int] = mapped_column(
+        ForeignKey("contracts.contract_id"), index=True
+    )
     contract: Mapped["Contracts"] = relationship(back_populates="contract_checklists")
 
-    type: Mapped[ChecklistType] = mapped_column(_enum_col(ChecklistType, "checklist_type_enum"))
+    type: Mapped[ChecklistType] = mapped_column(
+        _enum_col(ChecklistType, "checklist_type_enum")
+    )
     checklist_items: Mapped[dict | list | None] = mapped_column(JSON)
     tenant_signature: Mapped[str | None] = mapped_column(String(500))
     photo_urls: Mapped[dict | list | None] = mapped_column(JSON)
 
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
-    created_by_user: Mapped["Users | None"] = relationship(back_populates="checklists_created")
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id"), index=True
+    )
+    created_by_user: Mapped["Users | None"] = relationship(
+        back_populates="checklists_created"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -251,10 +279,14 @@ class ContractRequest(TimestampMixin, Base):
 
     request_id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
-    contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.contract_id"), index=True)
+    contract_id: Mapped[int] = mapped_column(
+        ForeignKey("contracts.contract_id"), index=True
+    )
     contract: Mapped["Contracts"] = relationship(back_populates="contract_requests")
 
-    request_type: Mapped[RequestType] = mapped_column(_enum_col(RequestType, "request_type_enum"))
+    request_type: Mapped[RequestType] = mapped_column(
+        _enum_col(RequestType, "request_type_enum")
+    )
     status: Mapped[RequestStatus] = mapped_column(
         _enum_col(RequestStatus, "request_status_enum"),
         default=RequestStatus.pending,
@@ -266,8 +298,12 @@ class ContractRequest(TimestampMixin, Base):
     staff_note: Mapped[str | None] = mapped_column(Text)
     damage_total: Mapped[float | None] = mapped_column(Numeric(10, 2))
 
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
-    handled_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id"), index=True
+    )
+    handled_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id"), index=True
+    )
     handled_at: Mapped[datetime.datetime | None] = mapped_column(Timestamp)
 
     created_by_user: Mapped["Users | None"] = relationship(foreign_keys=[created_by])
@@ -290,8 +326,12 @@ class RateConfig(TimestampMixin, Base):
     rate_value: Mapped[float] = mapped_column(Numeric(10, 2))
     effective_date: Mapped[datetime.date] = mapped_column(Date)
 
-    created_by: Mapped[int | None] = mapped_column(ForeignKey("users.user_id"), index=True)
-    created_by_user: Mapped["Users | None"] = relationship(back_populates="rate_configs")
+    created_by: Mapped[int | None] = mapped_column(
+        ForeignKey("users.user_id"), index=True
+    )
+    created_by_user: Mapped["Users | None"] = relationship(
+        back_populates="rate_configs"
+    )
 
 
 # ---------------------------------------------------------------------------

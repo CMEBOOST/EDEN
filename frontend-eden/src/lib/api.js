@@ -1,7 +1,8 @@
 import { clearToken, getToken } from "./auth";
 
 // base URL ของ backend — override ได้ด้วย env VITE_API_BASE (ไฟล์ .env)
-export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
+export const API_BASE =
+  import.meta.env.VITE_API_BASE ?? "http://localhost:8000";
 
 async function request(path, options = {}) {
   const token = getToken();
@@ -23,7 +24,9 @@ async function request(path, options = {}) {
       /* ไม่ใช่ JSON */
     }
     const msg =
-      typeof detail === "string" ? detail : detail.message ?? "เกิดข้อผิดพลาด";
+      typeof detail === "string"
+        ? detail
+        : (detail.message ?? "เกิดข้อผิดพลาด");
     const err = new Error(`${res.status}: ${msg}`);
     err.status = res.status;
     err.detail = detail;

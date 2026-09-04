@@ -20,7 +20,10 @@ function DocumentUploader({ value, onChange }) {
     onChange(value.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
 
   const addRow = () =>
-    onChange([...value, { doc_type: DOC_TYPES[0], file_url: "", filename: "" }]);
+    onChange([
+      ...value,
+      { doc_type: DOC_TYPES[0], file_url: "", filename: "" },
+    ]);
 
   const removeRow = (i) => onChange(value.filter((_, idx) => idx !== i));
 
@@ -67,7 +70,9 @@ function DocumentUploader({ value, onChange }) {
             />
           </label>
 
-          {row.file_url && <span className="text-green-600 text-xs">✓ แนบแล้ว</span>}
+          {row.file_url && (
+            <span className="text-green-600 text-xs">✓ แนบแล้ว</span>
+          )}
 
           <button
             type="button"

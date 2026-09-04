@@ -64,7 +64,9 @@ function RateForm({ rate, onClose, onEditExisting }) {
       onClose?.();
     } catch (err) {
       if (err.status === 409) {
-        setError(err.detail?.message ?? "มีอัตราประเภทนี้สำหรับวันที่นี้อยู่แล้ว");
+        setError(
+          err.detail?.message ?? "มีอัตราประเภทนี้สำหรับวันที่นี้อยู่แล้ว"
+        );
         setConflictId(err.detail?.existing_rate_id ?? null);
       } else {
         setError(err.message);

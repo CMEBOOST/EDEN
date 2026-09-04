@@ -301,9 +301,7 @@ function Profile() {
 
       <PasswordCard />
 
-      {data.tenant && (
-        <ContactCard tenant={data.tenant} onSaved={refetch} />
-      )}
+      {data.tenant && <ContactCard tenant={data.tenant} onSaved={refetch} />}
     </div>
   );
 }

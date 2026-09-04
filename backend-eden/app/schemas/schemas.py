@@ -31,6 +31,7 @@ class UserOut(BaseModel):
 
 class UserUpdate(BaseModel):
     """PATCH /users/{id} — ส่งมาเฉพาะ field ที่อยากแก้"""
+
     username: str | None = None
     is_active: bool | None = None
     avatar_url: str | None = None
@@ -73,6 +74,7 @@ class Tenants(BaseModel):
 
 class TenantUpdate(BaseModel):
     """สำหรับ PATCH/PUT — ส่งมาเฉพาะ field ที่อยากแก้"""
+
     full_name: str | None = None
     phone: str | None = None
     email: str | None = None
@@ -83,6 +85,7 @@ class TenantUpdate(BaseModel):
 
 class TenantSummary(BaseModel):
     """response สำหรับ list — ไม่มี national_id / field ภายใน"""
+
     tenant_id: int
     user_id: int
     full_name: str
@@ -97,11 +100,13 @@ class TenantSummary(BaseModel):
 
 class TenantOut(TenantSummary):
     """response สำหรับ detail — staff เห็น national_id ของผู้เช่ารายเดียวได้"""
+
     national_id_encrypted: str | None = None
 
 
 class ProfileTenantUpdate(BaseModel):
     """แก้ข้อมูลติดต่อของตัวเอง (ผู้เช่า) — ไม่มี field sensitive"""
+
     full_name: str | None = None
     phone: str | None = None
     email: str | None = None
@@ -129,11 +134,11 @@ class DocumentCreate(BaseModel):
 
 
 class RoomOut(BaseModel):
-    room_id: int          # = เลขห้อง
+    room_id: int  # = เลขห้อง
     floor: int
     base_rent: float
-    status: str           # "available" | "occupied"
-    contract_id: int | None = None   # สัญญาที่ผูกอยู่ (ถ้า occupied)
+    status: str  # "available" | "occupied"
+    contract_id: int | None = None  # สัญญาที่ผูกอยู่ (ถ้า occupied)
 
 
 class ChecklistItem(BaseModel):
@@ -162,6 +167,7 @@ class Contracts(BaseModel):
 
 class ContractUpdate(BaseModel):
     """สำหรับ PUT — ส่งมาเฉพาะ field ที่อยากแก้"""
+
     room_id: int | None = None
     start_date: datetime.date | None = None
     end_date: datetime.date | None = None
@@ -180,6 +186,7 @@ class ChecklistCreate(BaseModel):
 
 class ChecklistUpdate(BaseModel):
     """สำหรับ PATCH — ส่งมาเฉพาะ field ที่อยากแก้"""
+
     type: ChecklistType | None = None
     items: list[ChecklistItem] | None = None
     tenant_signature: str | None = None
@@ -194,6 +201,7 @@ class ContractRequestCreate(BaseModel):
 
 class ContractRequestUpdate(BaseModel):
     """สำหรับ PATCH — ส่งมาเฉพาะ field ที่อยากแก้"""
+
     status: RequestStatus | None = None
     staff_note: str | None = None
     preferred_date: datetime.date | None = None

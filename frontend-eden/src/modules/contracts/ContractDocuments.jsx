@@ -22,8 +22,11 @@ const inputCls =
 // section เอกสารแนบ — เอกสารเป็นของผู้เช่า (ใช้ร่วมกับสัญญาอื่นของผู้เช่ารายเดียวกัน)
 // readOnly = ดูอย่างเดียว (หน้าประวัติ) — ซ่อนปุ่มเพิ่ม/ลบ
 function ContractDocuments({ tenantId, readOnly = false }) {
-  const { data: rows = [], isPending: loading, error: loadError } =
-    useTenantDocuments(tenantId);
+  const {
+    data: rows = [],
+    isPending: loading,
+    error: loadError,
+  } = useTenantDocuments(tenantId);
   const addDocument = useAddTenantDocument();
   const deleteDocument = useDeleteDocument();
 

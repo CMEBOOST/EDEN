@@ -9,6 +9,7 @@ Create Date: 2026-09-02
 - contracts: CHECK end_date >= start_date, rent/deposit >= 0
 - rate_configs: CHECK rate_value >= 0
 """
+
 from typing import Sequence, Union
 
 from alembic import op

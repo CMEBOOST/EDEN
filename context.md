@@ -27,7 +27,8 @@ core เสร็จแล้ว — auth/RBAC, audit log, สร้างสั
 | Package manager | **uv** (`pyproject.toml` + `uv.lock`) |
 | DB | PostgreSQL 16 |
 | Auth/hash | bcrypt (pre-hash SHA-256) |
-| Frontend | React 19, Vite, React Router 7, Tailwind CSS 4 |
+| Frontend | React 19, Vite, React Router 7, Tailwind CSS 4, TanStack Query 5 |
+| Formatter | Prettier (frontend) · Ruff format (backend) — format-on-save + CI check |
 | Infra | Docker Compose (dev + `docker-compose.prod.yml`) — postgres, backend, frontend · pgadmin = profile `tools` |
 
 ---
@@ -296,6 +297,7 @@ npm run dev
 ## 10. Gotchas
 
 - มี `main.py` 2 ที่: `backend-eden/main.py` (shim) กับ `backend-eden/app/main.py` (ตัวจริง) — รันด้วย `app.main:app`
+- **backend dev hot reload:** dev compose รัน `uvicorn --reload --reload-dir app` + `WATCHFILES_FORCE_POLLING=true` (Docker Desktop bind mount) → แก้ `.py` reload เอง · **migration ใหม่ยังต้อง `docker compose restart backend`** (reload = restart worker ไม่ใช่ทั้ง `sh -c` ที่มี `alembic upgrade head`)
 - Alembic migration มี 7 อัน (chain เดียว, head `671e1a7f8221` = encrypt national_id) · init downgrade drop enum type ให้แล้ว (`downgrade base && upgrade head` ได้)
 - `_enum_col()` ใน models.py จำเป็น — ถ้าใช้ `SAEnum(MyEnum)` ตรง ๆ Postgres จะเก็บ *ชื่อ member* (`check_in`) ไม่ใช่ *value* (`check-in`)
 - repo ไม่มี `.gitattributes` → มี warning LF/CRLF เวลา `git add` บน Windows (ไม่กระทบอะไร)

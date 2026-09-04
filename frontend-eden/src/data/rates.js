@@ -8,8 +8,7 @@ export const useRates = () =>
 export const useCurrentRates = (date) =>
   useQuery({
     queryKey: qk.currentRates(date),
-    queryFn: () =>
-      apiGet(`/rates/current${date ? `?date=${date}` : ""}`),
+    queryFn: () => apiGet(`/rates/current${date ? `?date=${date}` : ""}`),
   });
 
 function useRatesInvalidate() {

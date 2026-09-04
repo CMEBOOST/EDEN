@@ -12,11 +12,7 @@ from .routers import routers
 
 # schema จัดการผ่าน Alembic:  alembic upgrade head
 
-app = FastAPI(
-    title="My Apartment API",
-    description="ระบบจัดการหอพัก",
-    version="1.0.0"
-)
+app = FastAPI(title="My Apartment API", description="ระบบจัดการหอพัก", version="1.0.0")
 
 # ลำดับ middleware สำคัญ — Starlette ใส่ตัวที่ add ทีหลังไว้ "ชั้นนอกกว่า"
 # ชั้นนอก → ชั้นใน:  CORS  →  ErrorHandler  →  Audit  →  router
@@ -38,9 +34,7 @@ app.add_middleware(
 @app.exception_handler(IntegrityError)
 async def _integrity_error(request: Request, exc: IntegrityError):
     """DB constraint ยิง (unique / check / fk) → 409 แทน 500"""
-    return JSONResponse(
-        status_code=409, content={"detail": "ข้อมูลขัดแย้งกับข้อมูลที่มีอยู่"}
-    )
+    return JSONResponse(status_code=409, content={"detail": "ข้อมูลขัดแย้งกับข้อมูลที่มีอยู่"})
 
 
 # เสิร์ฟไฟล์อัปโหลด (รูป checklist / เอกสาร / avatar) — ต้องล็อกอินก่อน
@@ -51,6 +45,7 @@ def serve_upload(name: str, _=Depends(get_user_for_file)):
     if not path.is_relative_to(UPLOAD_DIR.resolve()) or not path.is_file():
         raise HTTPException(status_code=404, detail="ไม่พบไฟล์")
     return FileResponse(path, headers={"Referrer-Policy": "no-referrer"})
+
 
 app.include_router(routers.auth_router)
 app.include_router(routers.router)
@@ -68,8 +63,4 @@ app.include_router(routers.dashboard_router)
 
 @app.get("/")
 def read_root():
-    return {
-        "status": "ok",
-        "message": "Welcome to Apartment API!",
-        "docs_url": "/docs"
-    }
+    return {"status": "ok", "message": "Welcome to Apartment API!", "docs_url": "/docs"}

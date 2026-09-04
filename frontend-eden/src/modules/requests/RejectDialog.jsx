@@ -46,7 +46,9 @@ function RejectDialog({ request, onClose }) {
         className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 flex flex-col gap-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-lg font-semibold">ปฏิเสธคำแจ้ง · {request.tenant_name}</h3>
+        <h3 className="text-lg font-semibold">
+          ปฏิเสธคำแจ้ง · {request.tenant_name}
+        </h3>
 
         {error && (
           <div className="bg-red-50 text-red-700 text-sm rounded px-3 py-2">

@@ -4,7 +4,11 @@ import femaleIcon from "../../assets/femaleIcon.png";
 import { fileUrl } from "./api";
 
 // รูปตั้งต้น (frontend-eden/assets/) — ใช้เป็นพรีเซ็ตให้เลือก
-export const AVATAR_PRESETS = { admin: adminIcon, male: maleIcon, female: femaleIcon };
+export const AVATAR_PRESETS = {
+  admin: adminIcon,
+  male: maleIcon,
+  female: femaleIcon,
+};
 
 export const PRESET_OPTIONS = [
   ["male", "ทั่วไป (ชาย)"],

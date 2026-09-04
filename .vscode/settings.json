@@ -7,6 +7,13 @@
   "python.analysis.autoSearchPaths": true,
   "python.terminal.activateEnvironment": true,
 
+  // format on save — Prettier (js/jsx/json/md) · Ruff (python)
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+
   "files.exclude": {
     "**/__pycache__": true,
     "**/*.pyc": true

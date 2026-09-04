@@ -69,11 +69,7 @@ def monthly_rent_total(db: Session) -> float:
 
 
 def tenant_home(db: Session, user_id: int) -> dict:
-    tenant = (
-        db.query(models.Tenants)
-        .filter(models.Tenants.user_id == user_id)
-        .first()
-    )
+    tenant = db.query(models.Tenants).filter(models.Tenants.user_id == user_id).first()
     if tenant is None:
         return {"tenant": None, "contract": None, "documents": [], "request": None}
 

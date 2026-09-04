@@ -77,7 +77,9 @@ function ContractForm() {
   const [documents, setDocuments] = useState([]);
 
   // อัตราค่าน้ำ/ค่าไฟ ณ วันเริ่มสัญญา (แสดงเฉย ๆ)
-  const { data: rates = null } = useCurrentRates(contract.start_date || undefined);
+  const { data: rates = null } = useCurrentRates(
+    contract.start_date || undefined
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -132,7 +134,10 @@ function ContractForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5 font-sans max-w-3xl">
+    <form
+      onSubmit={handleSubmit}
+      className="flex flex-col gap-5 font-sans max-w-3xl"
+    >
       <div className="flex items-center gap-3">
         <button
           type="button"
@@ -177,7 +182,8 @@ function ContractForm() {
               <option value="">— ไม่ระบุห้อง —</option>
               {rooms.map((r) => (
                 <option key={r.room_id} value={r.room_id}>
-                  {r.room_id} · ชั้น {r.floor} · {Number(r.base_rent).toLocaleString()} ฿
+                  {r.room_id} · ชั้น {r.floor} ·{" "}
+                  {Number(r.base_rent).toLocaleString()} ฿
                 </option>
               ))}
             </select>
@@ -257,8 +263,8 @@ function ContractForm() {
             </span>
           </div>
           <span className="text-xs text-sky-700/70">
-            * แสดงเพื่อประกอบการพิจารณา — บิลแต่ละเดือนคิดตามอัตราที่มีผลในเดือนนั้น
-            (สัญญาไม่ได้ผูกกับเรทนี้)
+            * แสดงเพื่อประกอบการพิจารณา —
+            บิลแต่ละเดือนคิดตามอัตราที่มีผลในเดือนนั้น (สัญญาไม่ได้ผูกกับเรทนี้)
           </span>
         </div>
 

@@ -1,4 +1,5 @@
 """Audit middleware — บันทึกทุก request ที่เปลี่ยนข้อมูลและสำเร็จ ลง audit_logs"""
+
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from ..crud import audit_crud, user_crud

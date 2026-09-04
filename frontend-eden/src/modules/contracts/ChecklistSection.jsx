@@ -37,8 +37,11 @@ const statusItemStyle = {
 // section บันทึกสภาพห้อง (checklists) ของสัญญา — ดู / แก้ / ลบ / เพิ่ม
 // readOnly = ดูอย่างเดียว (หน้าประวัติ) — ซ่อนปุ่มเพิ่ม/แก้/ลบ
 function ChecklistSection({ contractId, readOnly = false }) {
-  const { data: rows = [], isPending: loading, error: loadError } =
-    useChecklists(contractId);
+  const {
+    data: rows = [],
+    isPending: loading,
+    error: loadError,
+  } = useChecklists(contractId);
   const createChecklist = useCreateChecklist();
   const updateChecklist = useUpdateChecklist();
   const deleteChecklist = useDeleteChecklist();
@@ -211,10 +214,14 @@ function ChecklistSection({ contractId, readOnly = false }) {
               {normItems(row.checklist_items).map((it, i) => (
                 <li key={i} className="flex flex-wrap items-center gap-2">
                   <span className="w-32 shrink-0">{it.name}</span>
-                  <span className={statusItemStyle[it.status] ?? "text-gray-500"}>
+                  <span
+                    className={statusItemStyle[it.status] ?? "text-gray-500"}
+                  >
                     {it.status}
                   </span>
-                  {it.note && <span className="text-gray-400">— {it.note}</span>}
+                  {it.note && (
+                    <span className="text-gray-400">— {it.note}</span>
+                  )}
                   {row.type === "check-out" && Number(it.cost) > 0 && (
                     <span className="text-red-700">
                       ({Number(it.cost).toLocaleString()} ฿)

@@ -8,6 +8,7 @@
 background task ของ BaseHTTPMiddleware  · ต้องอยู่ "ข้างใน" CORSMiddleware
 (add ก่อน CORS ใน main.py) เพื่อให้ response ที่มันสร้างวิ่งกลับผ่าน CORS แล้วได้ header ครบ
 """
+
 import logging
 
 from starlette.responses import JSONResponse

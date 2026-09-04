@@ -22,7 +22,7 @@ docker compose up -d --build
 | frontend | http://localhost:5173   |
 | postgres | localhost:5433          |
 
-backend container จะรัน `alembic upgrade head` ให้อัตโนมัติตอนสตาร์ต
+backend container จะรัน `alembic upgrade head` ให้อัตโนมัติตอนสตาร์ต · แก้ `.py` แล้ว **uvicorn reload เอง** (ไม่ต้อง restart) — ยกเว้น migration ใหม่ต้อง `docker compose restart backend`
 
 **pgAdmin** ไม่ start โดยอัตโนมัติ — เปิดเมื่อต้องใช้:
 ```bash
@@ -58,6 +58,15 @@ cd frontend-eden
 npm install
 npm run dev
 ```
+
+## Format โค้ด
+
+```bash
+cd frontend-eden && npm run format        # Prettier (js/jsx/json/css/md) · เช็ค: npm run format:check
+cd backend-eden  && uv run ruff format     # Ruff (python) · เช็ค: uv run ruff format --check
+```
+
+VSCode: format-on-save เปิดไว้แล้ว (`.vscode/settings.json`) — ลง extension `esbenp.prettier-vscode` + `charliermarsh.ruff`
 
 ## รันแบบ production
 

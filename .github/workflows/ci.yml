@@ -40,6 +40,9 @@ jobs:
       - name: Type check (pyright)
         run: uvx pyright
 
+      - name: Format check (ruff)
+        run: uv run ruff format --check
+
       - name: Run migrations
         env:
           DATABASE_URL: postgresql://postgres:admin123@localhost:5432/EDEN_DB
@@ -73,6 +76,9 @@ jobs:
 
       - name: Lint
         run: npx eslint src/
+
+      - name: Format check (prettier)
+        run: npx prettier --check .
 
       - name: Build
         run: npx vite build

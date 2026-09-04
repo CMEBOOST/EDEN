@@ -125,7 +125,9 @@ function Rates() {
           <thead className="bg-gray-100 text-gray-600 uppercase text-xs tracking-wide">
             <tr>
               <th className="px-4 py-3 font-medium">ประเภท</th>
-              <th className="px-4 py-3 font-medium text-right">เรท (บาท/หน่วย)</th>
+              <th className="px-4 py-3 font-medium text-right">
+                เรท (บาท/หน่วย)
+              </th>
               <th className="px-4 py-3 font-medium">มีผลตั้งแต่</th>
               <th className="px-4 py-3 font-medium text-center">สถานะ</th>
               <th className="px-4 py-3 font-medium text-center">จัดการ</th>

@@ -1,4 +1,5 @@
 """JWT auth — สร้าง token, ดึง current user, ตรวจ role"""
+
 import datetime
 
 import jwt
@@ -82,9 +83,7 @@ def require_roles(*roles: str):
     def checker(user: models.Users = Depends(get_current_user)) -> models.Users:
         role = user.role.value if hasattr(user.role, "value") else user.role
         if role not in roles:
-            raise HTTPException(
-                status_code=403, detail="ไม่มีสิทธิ์ใช้งานส่วนนี้"
-            )
+            raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์ใช้งานส่วนนี้")
         return user
 
     return checker
