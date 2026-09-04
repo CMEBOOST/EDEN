@@ -1,7 +1,8 @@
-"""characterization: /upload/ (create) + GET /uploads/{name} (serve, auth, no ownership)"""
+"""/upload/ (create) + GET /uploads/{name} (serve, auth, per-file ownership)"""
 
 from app.core.auth import create_access_token
 from app.models import models
+from tests.factories import make_contract, make_tenant, make_user
 
 
 def test_upload_requires_auth(client):
@@ -58,15 +59,61 @@ def test_serve_uploaded_file_with_token_or_header(client, auth_client, upload_di
     assert client.get("/uploads/doc.png").status_code == 401
 
 
-def test_no_per_file_ownership_any_tenant_can_download(client, db, upload_dir):
-    """QUIRK: ไม่มี per-file ownership — ผู้เช่าคนไหนก็โหลดไฟล์ของคนอื่นได้ถ้ารู้ชื่อไฟล์
-    (bug ที่จะปิด — เพิ่ม ownership lookup)"""
-    from tests.factories import make_user
+def test_tenant_cannot_download_other_tenants_file(client, db, upload_dir):
+    # ไฟล์ผูกกับเอกสารของ tenant A
+    a = make_tenant(db)
+    (upload_dir / "a-id-card.png").write_bytes(b"SECRET")
+    db.add(
+        models.TenantDocument(
+            tenant_id=a.tenant_id, doc_type="id", file_url="/uploads/a-id-card.png"
+        )
+    )
+    db.commit()
 
-    (upload_dir / "tenant-a-id-card.png").write_bytes(b"SECRET")
     tenant_b = make_user(db, models.Role.tenant)
     token = create_access_token(tenant_b.username)
+    res = client.get(f"/uploads/a-id-card.png?token={token}")
+    assert res.status_code == 404
 
-    res = client.get(f"/uploads/tenant-a-id-card.png?token={token}")
-    assert res.status_code == 200
-    assert res.content == b"SECRET"
+
+def test_tenant_can_download_own_files(client, as_user, db, upload_dir):
+    t = make_tenant(db)
+    for fn in ("av.png", "doc.png", "contract.pdf", "photo.png", "orphan.png"):
+        (upload_dir / fn).write_bytes(b"X")
+
+    t.user.avatar_url = "/uploads/av.png"
+    db.add(
+        models.TenantDocument(
+            tenant_id=t.tenant_id, doc_type="id", file_url="/uploads/doc.png"
+        )
+    )
+    c = make_contract(
+        db, tenant=t, room_id=None, contract_file_url="/uploads/contract.pdf"
+    )
+    db.add(
+        models.ContractChecklist(
+            contract_id=c.contract_id,
+            type=models.ChecklistType.check_in,
+            photo_urls=["/uploads/photo.png"],
+        )
+    )
+    db.commit()
+
+    as_user(t.user)
+    for fn in ("av.png", "doc.png", "contract.pdf", "photo.png"):
+        assert client.get(f"/uploads/{fn}").status_code == 200, fn
+    # ไฟล์ที่ไม่ผูกกับ record ไหน → 404
+    assert client.get("/uploads/orphan.png").status_code == 404
+
+
+def test_staff_can_download_any_file(client, auth_client, db, upload_dir):
+    a = make_tenant(db)
+    (upload_dir / "x.png").write_bytes(b"X")
+    db.add(
+        models.TenantDocument(
+            tenant_id=a.tenant_id, doc_type="id", file_url="/uploads/x.png"
+        )
+    )
+    db.commit()
+    auth_client(models.Role.staff)
+    assert client.get("/uploads/x.png").status_code == 200
