@@ -1,5 +1,5 @@
 """characterization: /contract-requests/* workflow — create, list (row-filtered),
-PATCH transitions, DELETE. รวม bug ที่ complete แล้วไม่ทำอะไรจริง (`# QUIRK`)
+PATCH transitions, DELETE. lock พฤติกรรมปัจจุบันรวม bug ที่จะแก้ทีหลัง (`# QUIRK`)
 """
 
 import datetime
@@ -30,7 +30,7 @@ def _req(
 
 # ── create ───────────────────────────────────────────────────────────────────
 def test_tenant_creates_on_own_contract(client, as_user, db):
-    c = make_contract(db, room_id=None)
+    c = make_contract(db, room_id=None, status=models.ContractStatus.active)
     tenant = db.get(models.Tenants, c.tenant_id)
     as_user(tenant.user)
     res = client.post(
@@ -46,7 +46,7 @@ def test_tenant_creates_on_own_contract(client, as_user, db):
 
 
 def test_tenant_cannot_request_other_contract(client, as_user, db):
-    c = make_contract(db, room_id=None)
+    c = make_contract(db, room_id=None, status=models.ContractStatus.active)
     other = make_tenant(db)
     as_user(other.user)
     res = client.post(
@@ -63,7 +63,7 @@ def test_tenant_cannot_request_other_contract(client, as_user, db):
 
 def test_staff_can_request_any_contract(client, auth_client, db):
     auth_client(models.Role.staff)
-    c = make_contract(db, room_id=None)
+    c = make_contract(db, room_id=None, status=models.ContractStatus.active)
     res = client.post(
         "/contract-requests/",
         json={
@@ -86,7 +86,7 @@ def test_create_missing_contract_404(client, auth_client):
 
 def test_one_open_request_per_contract(client, auth_client, db):
     auth_client(models.Role.staff)
-    c = make_contract(db, room_id=None)
+    c = make_contract(db, room_id=None, status=models.ContractStatus.active)
     _req(db, c, status=models.RequestStatus.pending)
     res = client.post(
         "/contract-requests/",
@@ -112,19 +112,26 @@ def test_one_open_request_per_contract(client, auth_client, db):
     assert res.status_code == 200
 
 
-def test_create_does_not_validate_contract_state_or_preferred_date(
-    client, auth_client, db
-):
+def test_create_request_requires_active_contract(client, auth_client, db):
     auth_client(models.Role.staff)
-    c = make_contract(db, room_id=None, status=models.ContractStatus.terminated)
-    # QUIRK: renew บนสัญญา terminated + ไม่ใส่ preferred_date → ผ่าน
+    body = {"contract_id": None, "request_type": "renew", "tenant_note": "x"}
+
+    for st in (
+        models.ContractStatus.draft,
+        models.ContractStatus.expired,
+        models.ContractStatus.terminated,
+    ):
+        c = make_contract(db, room_id=None, status=st)
+        res = client.post(
+            "/contract-requests/", json={**body, "contract_id": c.contract_id}
+        )
+        assert res.status_code == 400
+        assert res.json()["detail"] == "แจ้งความจำนงได้เฉพาะสัญญาที่ใช้งานอยู่"
+
+    # active + ไม่ใส่ preferred_date → ยังผ่าน (preferred_date ยัง optional)
+    c = make_contract(db, room_id=None, status=models.ContractStatus.active)
     res = client.post(
-        "/contract-requests/",
-        json={
-            "contract_id": c.contract_id,
-            "request_type": "renew",
-            "tenant_note": "x",
-        },
+        "/contract-requests/", json={**body, "contract_id": c.contract_id}
     )
     assert res.status_code == 200
     assert res.json()["preferred_date"] is None

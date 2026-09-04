@@ -1,8 +1,4 @@
-"""characterization: role guard matrix (app/core/auth.py + router dependencies)
-
-lock พฤติกรรม RBAC ปัจจุบัน — บาง endpoint (/rates/{id}, /rates/current) ไม่มี
-role guard เลย ผู้เช่าเข้าได้ ดู `# QUIRK` ด้านล่าง
-"""
+"""characterization: role guard matrix (app/core/auth.py + router dependencies)"""
 
 import pytest
 
@@ -25,6 +21,8 @@ TENANT_FORBIDDEN = [
     ("GET", "/users/1"),
     ("GET", "/rooms/"),
     ("GET", "/rates/"),
+    ("GET", "/rates/current"),
+    ("GET", "/rates/1"),
     ("GET", "/audit-logs/"),
     ("POST", "/upload/"),
     ("DELETE", "/documents/1"),
@@ -49,8 +47,6 @@ TENANT_ALLOWED = [
     ("GET", "/dashboard/"),
     ("GET", "/profile/"),
     ("GET", "/contract-requests/"),
-    ("GET", "/rates/current"),
-    ("GET", "/rates/1"),  # QUIRK: /rates/{id} ไม่มี role guard — tenant อ่านได้
 ]
 
 

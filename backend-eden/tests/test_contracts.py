@@ -88,12 +88,21 @@ def test_create_documents_attach_to_tenant(client, auth_client, db):
     assert doc.uploaded_by == me.user_id
 
 
-def test_create_status_is_client_settable(client, auth_client, db):
+def test_create_rejects_terminated_status(client, auth_client, db):
     auth_client(models.Role.staff)
     tenant = make_tenant(db)
-    # QUIRK: payload กำหนด status ได้เอง — สร้าง active ตรง ๆ โดยไม่ผ่าน workflow
-    res = client.post("/contracts/", json=_payload(tenant.tenant_id, status="active"))
-    assert res.json()["status"] == "active"
+
+    # draft/active/expired — สร้างได้ (backfill ข้อมูลเก่า / ผู้เช่าเข้าอยู่แล้ว)
+    for st in ("active", "expired"):
+        res = client.post("/contracts/", json=_payload(tenant.tenant_id, status=st))
+        assert res.status_code == 200
+        assert res.json()["status"] == st
+
+    # terminated — ตายตั้งแต่เกิด ไม่มีเหตุผล → 400
+    res = client.post(
+        "/contracts/", json=_payload(tenant.tenant_id, status="terminated")
+    )
+    assert res.status_code == 400
 
 
 def test_create_validation_paths(client, auth_client, db):

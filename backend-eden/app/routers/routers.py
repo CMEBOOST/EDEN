@@ -283,6 +283,11 @@ def create_contract_route(
         raise HTTPException(status_code=400, detail="ไม่พบ tenant_id นี้")
     if contract.end_date < contract.start_date:
         raise HTTPException(status_code=400, detail="end_date ต้องไม่ก่อน start_date")
+    if contract.status == ContractStatus.terminated:
+        raise HTTPException(
+            status_code=400,
+            detail="สร้างสัญญาสถานะ 'ยกเลิก' ไม่ได้ — ยุติสัญญาที่มีอยู่แทน",
+        )
     if contract.room_id is not None:
         if not room_crud.room_exists(db=db, room_id=contract.room_id):
             raise HTTPException(status_code=400, detail="ไม่พบห้องนี้")
@@ -509,7 +514,7 @@ def list_rates_route(type: str | None = None, db: Session = Depends(get_db)):
     return rate_crud.get_rates(db=db, type_=type)
 
 
-@rate_router.get("/current")
+@rate_router.get("/current", dependencies=_staff)
 def current_rates_route(
     date: datetime.date | None = None, db: Session = Depends(get_db)
 ):
@@ -520,7 +525,7 @@ def current_rates_route(
     }
 
 
-@rate_router.get("/{rate_id}")
+@rate_router.get("/{rate_id}", dependencies=_staff)
 def get_rate_route(rate_id: int, db: Session = Depends(get_db)):
     rate = rate_crud.get_rate(db=db, rate_id=rate_id)
     if rate is None:
@@ -605,6 +610,9 @@ def create_request_route(
             raise HTTPException(
                 status_code=403, detail="แจ้งความจำนงได้เฉพาะสัญญาของตัวเอง"
             )
+
+    if contract.status != ContractStatus.active:
+        raise HTTPException(status_code=400, detail="แจ้งความจำนงได้เฉพาะสัญญาที่ใช้งานอยู่")
 
     if request_crud.has_open_request(db=db, contract_id=data.contract_id) is not None:
         raise HTTPException(status_code=409, detail="มีคำแจ้งความจำนงที่ยังไม่ดำเนินการอยู่แล้ว")
