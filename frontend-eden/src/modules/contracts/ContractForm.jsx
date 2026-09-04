@@ -168,7 +168,7 @@ function ContractForm() {
               <option value="">— เลือกผู้เช่า —</option>
               {tenants.map((t) => (
                 <option key={t.tenant_id} value={t.tenant_id}>
-                  {t.full_name} · #{t.tenant_id}
+                  {t.full_name}
                 </option>
               ))}
             </select>
