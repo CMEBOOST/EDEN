@@ -72,13 +72,15 @@ def me_route(user: models.Users = Depends(get_current_user)):
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.post(
-    "/",
-    response_model=schemas.UserOut,
-    dependencies=[Depends(require_admin)],
-    status_code=201,
-)
-def create_user_route(user: schemas.User, db: Session = Depends(get_db)):
+@router.post("/", response_model=schemas.UserOut, status_code=201)
+def create_user_route(
+    user: schemas.User,
+    db: Session = Depends(get_db),
+    me: models.Users = Depends(require_staff),
+):
+    # staff เพิ่มได้เฉพาะบัญชีผู้เช่า · admin เพิ่ม role ไหนก็ได้
+    if me.role != models.Role.admin and user.role != models.Role.tenant:
+        raise HTTPException(status_code=403, detail="พนักงานเพิ่มบัญชีได้เฉพาะสิทธิ์ผู้เช่า")
     if user_crud.get_user_by_username(db, user.username) is not None:
         raise HTTPException(status_code=409, detail="username นี้มีอยู่แล้ว")
     return user_crud.create_user(db=db, user=user)
@@ -825,9 +827,23 @@ def dashboard_route(
             },
         }
 
+    breakdown = dashboard_crud.status_breakdown(db)
+    rooms = dashboard_crud.room_stats(db)
+    base_counts = dashboard_crud.counts(db)
     data = {
         "role": role,
-        "counts": dashboard_crud.counts(db),
+        "counts": {
+            **base_counts,
+            "contracts_expired": breakdown["expired"],
+            "contracts_terminated": breakdown["terminated"],
+            "rooms_total": rooms["total"],
+            "rooms_vacant": rooms["vacant"],
+        },
+        "occupancy_rate": (
+            round(rooms["occupied"] / rooms["total"] * 100, 1) if rooms["total"] else 0
+        ),
+        "status_breakdown": breakdown,
+        "new_contracts_monthly": dashboard_crud.new_contracts_monthly(db, months=6),
         "expiring": dashboard_crud.expiring_contracts(db, days=30),
     }
     if role == "admin":

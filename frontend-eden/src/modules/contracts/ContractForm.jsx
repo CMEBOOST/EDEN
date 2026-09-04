@@ -16,11 +16,11 @@ const fmtBaht = (n) =>
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
 
+// สร้างสัญญายกเลิก (terminated) ไม่ได้ — ยุติสัญญาที่มีอยู่ผ่านตรวจคืนห้องแทน
 const STATUS_OPTIONS = [
   ["draft", "ร่าง"],
   ["active", "ใช้งาน"],
   ["expired", "หมดอายุ"],
-  ["terminated", "ยกเลิก"],
 ];
 
 const DEFAULT_CHECKLIST = [

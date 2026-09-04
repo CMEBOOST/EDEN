@@ -19,6 +19,7 @@ TENANT_FORBIDDEN = [
     ("PUT", "/tenants/1"),
     ("GET", "/users/"),
     ("GET", "/users/1"),
+    ("POST", "/users/"),
     ("GET", "/rooms/"),
     ("GET", "/rates/"),
     ("GET", "/rates/current"),
@@ -31,7 +32,6 @@ TENANT_FORBIDDEN = [
 
 # endpoint ที่ staff โดน 403 — admin เท่านั้น
 STAFF_FORBIDDEN = [
-    ("POST", "/users/"),
     ("PATCH", "/users/1/role"),
     ("POST", "/contracts/run-expire"),
     ("DELETE", "/contracts/1"),

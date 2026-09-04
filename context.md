@@ -1,7 +1,7 @@
 # EDEN — Context
 
 เอกสารสรุปบริบทโปรเจกต์ สำหรับคนใหม่ (หรือ AI assistant) อ่านให้เข้าใจภาพรวมเร็ว ๆ
-อัปเดตล่าสุด: 2026-09-02
+อัปเดตล่าสุด: 2026-09-04
 
 ---
 
@@ -11,7 +11,7 @@
 เก็บข้อมูลผู้เช่า สัญญาเช่า เอกสารผู้เช่า อัตราค่าน้ำ/ไฟ และ audit log
 core เสร็จแล้ว — auth/RBAC, audit log, สร้างสัญญาแบบ atomic, workflow แจ้งความจำนง
 (ต่อ/ยุติสัญญา + ตรวจคืนห้อง + คิดเงินคืน), encryption at rest, DB constraints
-· **ยังขาด**: billing/มิเตอร์, tests, production build
+· **ยังขาด**: billing/มิเตอร์ · ปิด 🟠 bug ที่ characterization test lock ไว้ (`# QUIRK`)
 
 - เจ้าของ/ผู้พัฒนา: นักศึกษา ม.อุบลราชธานี (surachet.se.67@ubu.ac.th)
 - repo หลัก: `github.com/CMEBOOST/EDEN.git` (remote `origin`)
@@ -29,6 +29,7 @@ core เสร็จแล้ว — auth/RBAC, audit log, สร้างสั
 | Auth/hash | bcrypt (pre-hash SHA-256) |
 | Frontend | React 19, Vite, React Router 7, Tailwind CSS 4, TanStack Query 5 |
 | Formatter | Prettier (frontend) · Ruff format (backend) — format-on-save + CI check |
+| Test | pytest (`backend-eden/tests/`, DB แยก `eden_test`) · Vitest + React Testing Library (`frontend-eden/`) — รันใน CI |
 | Infra | Docker Compose (dev + `docker-compose.prod.yml`) — postgres, backend, frontend · pgadmin = profile `tools` |
 
 ---
@@ -68,7 +69,7 @@ EDEN/
 │   │   └── modules/
 │   │       ├── dashboard/ Dashboard.jsx (หน้า `/` — แตกตาม role: admin/staff KPI, tenant สัญญาตัวเอง)
 │   │       ├── profile/   Profile.jsx (หน้า /profile — ทุก role: avatar + เปลี่ยนรหัสตัวเอง + ข้อมูลติดต่อ [เฉพาะผู้เช่า])
-│   │       ├── users/     จัดการผู้ใช้ /users (admin) — Users.jsx, UserForm.jsx (เพิ่ม), UserEditModal.jsx (username+avatar), PasswordResetDialog.jsx
+│   │       ├── users/     จัดการผู้ใช้ /users (staff+ · staff = read-only + เพิ่ม tenant) — Users.jsx, UserForm.jsx, UserEditModal.jsx, PasswordResetDialog.jsx
 │   │       ├── audit/     AuditLog.jsx (/log — admin, filter user + ค้นหา + โหลดเพิ่ม)
 │   │       ├── tenants/   Tenants.jsx (list — row คลิก→detail), TenantForm.jsx (เพิ่ม), TenantDetail.jsx (/tenants/:id),
 │   │       │              TenantInfoSection.jsx (view/edit), TenantAccountSection.jsx, TenantContractsSection.jsx
@@ -170,7 +171,7 @@ Base: `http://localhost:8000` · Swagger: `/docs`
 - **tenant**: เข้าได้แค่ `/dashboard/`, `/auth/me`, `/profile/*` (แก้ของตัวเอง), `/rates/current`, `/contract-requests/` (POST + GET + DELETE เฉพาะของตัวเอง; ยกเลิกได้เฉพาะ status=pending) — เข้า `/tenants` `/contracts` `/rates` list → 403
 - **ต่อสัญญา** = `PUT /contracts/{id}` `{end_date}` (staff+) · **ตรวจสภาพห้องออก** = `POST .../checklists` `{type:check-out}` (staff+) · ตั้ง `terminated` = admin เท่านั้น (staff ตรวจได้ แต่ยุติไม่ได้)
 - `DELETE /tenants/{id}` = **soft delete** (ปิด `is_active` ของ user ที่ผูก, ข้อมูลไม่หาย)
-- `/uploads/<file>` ต้องล็อกอิน (`get_user_for_file` — รับ token ทาง `Authorization` header หรือ `?token=`) · `fileUrl()` ฝั่ง frontend ต่อ `?token=` ให้อัตโนมัติ · ยังไม่เช็ค per-file ownership
+- `/uploads/<file>` ต้องล็อกอิน (`get_user_for_file` — รับ token ทาง `Authorization` header หรือ `?token=`) · `fileUrl()` ฝั่ง frontend ต่อ `?token=` ให้อัตโนมัติ · per-file ownership: staff เห็นหมด · tenant เฉพาะไฟล์ตัวเอง (`file_crud.user_may_access`) ไม่ใช่ → 404
 
 **Audit log:** `AuditMiddleware` ([app/core/audit.py](backend-eden/app/core/audit.py)) บันทึกทุก request ที่ method เป็น POST/PUT/PATCH/DELETE + สำเร็จ (2xx) ลง `audit_logs` โดย decode token เอาว่าใครทำ + `describe()` แปลง method+path เป็นข้อความไทย · login บันทึกแยกใน route
 
@@ -259,17 +260,17 @@ npm run dev
 - [x] auth เต็ม — ทุก endpoint ต้องล็อกอิน, write = staff+, จัดการสิทธิ์ + audit = admin
 - [x] `UserOut` (ไม่มี password_hash) · secret ไป `.env`
 - [x] audit log — middleware บันทึกทุก write อัตโนมัติ
-- [x] คำแจ้งความจำนง (UC3.8 ต่อสัญญา / ยุติสัญญา) — `contract_requests` + `/contract-requests/*` · ต่อ = ขยาย end_date · ยุติ = ตรวจห้องออก (`ChecklistItem.cost`) + คิดเงินคืน
+- [x] คำแจ้งความจำนง (UC3.8 ต่อสัญญา / ยุติสัญญา) — `contract_requests` + `/contract-requests/*` · PATCH `status=completed` ทำงาน server-side: `renew` → ขยาย `contract.end_date` จาก `preferred_date` · `terminate` → ตั้ง `terminated` + `damage_total` = ผลรวม `cost` จาก check-out checklist · state machine lenient (completed/rejected = terminal)
 - [x] เก็บ `created_by`/`uploaded_by`/`last_login_at` จาก current user (backend เซ็ตเอง ไม่รับจาก client)
 - [x] DB constraint: `tenants.user_id` unique · 1 ห้อง–1 สัญญา active · CHECK วันที่/ค่าเงิน ≥ 0 · IntegrityError → 409
 - [x] สร้างสัญญา atomic — `POST /contracts/` รับ checklist check-in + เอกสาร ในทรานแซกชันเดียว
-- [x] `POST /contracts/run-expire` (admin) — ตั้ง active ที่เลย end_date เป็น expired (เอาไป cron)
+- [x] `POST /contracts/run-expire` (admin) — ตั้ง active ที่เลย end_date เป็น expired · auto: `scripts/expire-contracts.sh` → `expire_contracts.py` + host cron
 - [x] response schema แยกสำหรับ tenants — `TenantSummary` (list, ไม่มี national_id/last_login_at/updated_at) · `TenantOut` (detail `GET/POST/PUT /tenants/{id}`, staff เห็น national_id ได้) · `/dashboard/` มุมมองผู้เช่าใช้ `_tenant_public`
 - [x] ตาราง `rooms` + FK `contracts.room_id → rooms` (ON DELETE SET NULL) — migration `c4f2a9b17d30` (สร้างตาราง + seed 40 ห้อง + ล้าง room_id เก่าที่ไม่ตรง) · `Room` model, `/rooms/?available=`, `RoomOut`
 - [x] เข้ารหัส `national_id_encrypted` จริง — Fernet ผ่าน `EncryptedStr` TypeDecorator (`app/core/crypto.py`, โปร่งใสต่อ CRUD/schema) · key จาก env `FIELD_ENCRYPTION_KEY` (ไม่ตั้ง = อนุมานจาก `SECRET_KEY`) · migration `671e1a7f8221` เข้ารหัสข้อมูลเดิม (idempotent + reversible) · dep `cryptography`
 - [x] ContractForm submit เป็น 1 request atomic แล้ว (upload ไฟล์ยังแยก — orphan file ถ้าพัง)
-- [x] `/uploads/<file>` ต้องล็อกอินก่อน — route `GET /uploads/{name:path}` (`get_user_for_file`) แทน `StaticFiles` mount · `<img>`/`<a>` แนบ header ไม่ได้ → `fileUrl()` ต่อ `?token=<JWT>` · guard path traversal + `Referrer-Policy: no-referrer` · **ยังไม่มี per-file ownership** (ผู้ล็อกอินใด ๆ + รู้ชื่อไฟล์ = โหลดได้ · ชื่อเป็น uuid4)
-- [ ] เขียน tests
+- [x] `/uploads/<file>` ต้องล็อกอินก่อน — route `GET /uploads/{name:path}` (`get_user_for_file`) แทน `StaticFiles` mount · `<img>`/`<a>` แนบ header ไม่ได้ → `fileUrl()` ต่อ `?token=<JWT>` · guard path traversal + `Referrer-Policy: no-referrer` · **per-file ownership** (`app/crud/file_crud.py`) — staff/admin เห็นทุกไฟล์ · tenant เฉพาะ avatar/เอกสาร/สัญญา/checklist ของตัวเอง · ไม่ผ่าน → 404
+- [x] tests — infra + smoke + **characterization suite** (~185 เทสต์): backend `backend-eden/tests/` (pytest, DB `eden_test`, fixtures `db`/`client`/`admin_client`/`staff_client`/`tenant_client`/`auth_client`/`as_user`, factories `make_user/make_tenant/make_room/make_contract` + `raw_national_id`) ครอบ RBAC matrix · contract create/finished-quirk/run-expire · request workflow · checklist · encryption · /uploads · audit · dashboard · frontend `frontend-eden/src/**/*.test.*` (Vitest + RTL, `src/test/utils.jsx`) ครอบ invalidation rules · query URL building · `api.js` wrapper · `RequireAuth` · รันใน CI · ช่องโหว่/quirk ที่ characterization เคย lock ไว้ปิดหมดแล้ว (finished-quirk, /rates guard, contract status, request workflow, /uploads ownership, POST→201, non-int contract id→404)
 
 **Frontend**
 - [x] auth: Login page, AuthContext, RequireAuth, Bearer header, role-aware Sidebar/Topbar, จัดการสิทธิ์, Audit Log
@@ -277,7 +278,7 @@ npm run dev
 - [x] RBAC frontend — เมนู/route จำกัดตาม role, ซ่อนปุ่มลบ/ยุติสัญญาสำหรับ non-admin
 - [x] ต่อ API จริง (`lib/api.js`), หน้า Tenants / Contracts / Rates (list + เพิ่ม/แก้/ลบ), ContractForm
 - [x] คำแจ้งความจำนง — tenant กดจาก Dashboard · staff เห็น RequestPanel บน `/contracts` · หน้าตรวจห้องออก `/contracts/:id/checkout`
-- [x] จัดการผู้ใช้ `/users` (เดิม `/permission` → redirect) — แก้ username, avatar (อัปโหลด/พรีเซ็ต), admin ตั้งรหัสผ่านใหม่, คอลัมน์ผู้เช่า
+- [x] จัดการผู้ใช้ `/users` (เดิม `/permission` → redirect) — **admin:** แก้ username/avatar/role, ปิดบัญชี, ตั้งรหัสผ่านใหม่ · **staff:** read-only + เพิ่มบัญชี `tenant` เท่านั้น (`POST /users/` = staff+, staff เพิ่ม role≠tenant → 403)
 - [x] Profile `/profile` (เข้าจาก Topbar) — avatar + เปลี่ยนรหัสตัวเอง (UC6.2) + ผู้เช่าแก้ข้อมูลติดต่อตัวเอง (UC2.5, ยกเว้น national_id)
 - [x] หน้า contract detail `/contracts/:id` (ContractDetail + InfoSection/ChecklistSection/Documents) + ประวัติสัญญา `/contracts/history`
 - [x] หน้า tenant detail `/tenants/:id` (TenantDetail — ข้อมูลผู้เช่า ดู/แก้ + บัญชีผู้ใช้ + สัญญา + เอกสาร) · list row คลิก→detail เหมือน contracts
@@ -287,7 +288,7 @@ npm run dev
 - [x] frontend service อยู่ใน `eden-network` + `container_name` + `depends_on: backend (healthy)`
 - [x] `SECRET_KEY` ไม่ถูกฝังใน image · uploads อยู่นอก image · `npm ci` แทน `npm install`
 - [x] pin image เวอร์ชันทุกตัว · healthcheck backend · root `.env` สำหรับ compose (port/password)
-- [x] CI — `.github/workflows/ci.yml` (backend: pyright + alembic upgrade · frontend: eslint + vite build)
+- [x] CI — `.github/workflows/ci.yml` (backend: pyright + ruff format + alembic upgrade + pytest · frontend: eslint + prettier + vitest + vite build)
 - [x] `VITE_API_BASE` ตั้งผ่าน env — `frontend-eden/.env.example` · Dockerfile `ARG`+`ENV` · compose `frontend.build.args` + `environment` (ค่าจาก `${VITE_API_BASE}` ที่ root `.env`) · `lib/api.js` อ่านอยู่แล้ว · default `http://localhost:8000`
 - [x] production stack — `docker-compose.prod.yml` + `frontend-eden/Dockerfile` multi-stage (`dev`/`build`/`runtime`) · frontend build → nginx (SPA fallback + proxy `/api/` → backend, single origin) · backend `uvicorn --workers ${WEB_CONCURRENCY}` · migration = service `migrate` one-shot (`service_completed_successfully`) · uploads = named volume · backend/postgres ไม่ expose · `.env.prod.example`
 - [x] backup Postgres — `scripts/backup.sh` / `scripts/restore.sh` (pg_dump `-Fc` / pg_restore ผ่าน `docker compose exec`, rotation, ใช้ dev/prod ด้วย `-f`) · cron ตัวอย่างใน README · pgadmin → compose profile `tools` (ไม่ start อัตโนมัติ)
@@ -306,3 +307,5 @@ npm run dev
 - **pgadmin = profile `tools`** — `docker compose up` ปกติไม่ start · ต้อง `docker compose --profile tools up -d pgadmin`
 - **restore.sh** หยุด `backend`/`migrate` ก่อน `pg_restore --clean` (กัน connection ค้างตอน DROP) แล้ว start `backend` คืน
 - prod: `VITE_API_BASE=/api` (nginx proxy strip prefix ไป `backend:8000`) — ไม่ต้องแตะ CORS · dev: `http://localhost:8000` (เรียกตรง)
+- **pytest ต้องมี Postgres รันอยู่** (`docker compose up -d postgres`) — `tests/conftest.py` เขียน `DATABASE_URL` ใหม่เป็น db `eden_test` บน server เดียวกัน (drop+create ทุก session, `alembic upgrade head`, truncate ทุกเทสต์) · ไม่แตะ `EDEN_DB` · ตั้ง env `DATABASE_URL` override host ได้ (CI ใช้ service postgres)
+- **Vitest** อย่า import `src/lib/queryClient.js` ในเทสต์ (singleton + ผูก `window` listener) — ใช้ `makeClient()`/`createWrapper()` จาก `src/test/utils.jsx` แทน · hook tests mock `../lib/api` ด้วย `vi.mock`

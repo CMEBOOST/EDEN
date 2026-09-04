@@ -27,6 +27,7 @@ const roleStyle = {
 
 function Users() {
   const { user: me } = useAuth();
+  const isAdmin = me?.role === "admin";
   const { data: users = [], isPending: loading, error } = useUsers();
   const { data: tenants = [] } = useTenants();
   const setRole = useSetUserRole();
@@ -74,7 +75,9 @@ function Users() {
         <div>
           <h2 className="text-3xl">จัดการผู้ใช้</h2>
           <p className="text-gray-500">
-            บัญชีผู้ใช้ · role · สถานะ · รหัสผ่าน{" "}
+            {isAdmin
+              ? "บัญชีผู้ใช้ · role · สถานะ · รหัสผ่าน"
+              : "ดูบัญชีผู้ใช้ · เพิ่มบัญชีผู้เช่า"}{" "}
             {!loading && `(${users.length})`}
           </p>
         </div>
@@ -82,7 +85,7 @@ function Users() {
           onClick={() => setShowForm(true)}
           className="px-3 py-2 text-sm rounded bg-blue-500 text-white hover:bg-blue-600 h-fit"
         >
-          เพิ่มผู้ใช้
+          {isAdmin ? "เพิ่มผู้ใช้" : "เพิ่มผู้เช่า"}
         </button>
       </div>
 
@@ -95,20 +98,28 @@ function Users() {
               <th className="px-4 py-3 font-medium">ผู้เช่า</th>
               <th className="px-4 py-3 font-medium text-center">สถานะ</th>
               <th className="px-4 py-3 font-medium">สร้างเมื่อ</th>
-              <th className="px-4 py-3 font-medium text-center">จัดการ</th>
+              {isAdmin && (
+                <th className="px-4 py-3 font-medium text-center">จัดการ</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+                <td
+                  colSpan={isAdmin ? 6 : 5}
+                  className="px-4 py-6 text-center text-gray-400"
+                >
                   กำลังโหลด...
                 </td>
               </tr>
             )}
             {error && !loading && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-red-600">
+                <td
+                  colSpan={isAdmin ? 6 : 5}
+                  className="px-4 py-6 text-center text-red-600"
+                >
                   โหลดข้อมูลไม่สำเร็จ: {error.message}
                 </td>
               </tr>
@@ -116,7 +127,10 @@ function Users() {
 
             {!loading && !error && sorted.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-gray-400">
+                <td
+                  colSpan={isAdmin ? 6 : 5}
+                  className="px-4 py-6 text-center text-gray-400"
+                >
                   ยังไม่มีผู้ใช้
                 </td>
               </tr>
@@ -149,16 +163,7 @@ function Users() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {u.role === "tenant" ? (
-                        <span
-                          title="บัญชีผู้เช่าเปลี่ยนสิทธิ์ไม่ได้"
-                          className={`inline-block px-2 py-1 rounded text-sm ${
-                            roleStyle.tenant
-                          }`}
-                        >
-                          {ROLE_LABEL.tenant}
-                        </span>
-                      ) : (
+                      {isAdmin && u.role !== "tenant" ? (
                         <select
                           value={u.role}
                           disabled={disabled}
@@ -173,45 +178,69 @@ function Users() {
                             </option>
                           ))}
                         </select>
+                      ) : (
+                        <span
+                          className={`inline-block px-2 py-1 rounded text-sm ${
+                            roleStyle[u.role] ?? roleStyle.tenant
+                          }`}
+                        >
+                          {ROLE_LABEL[u.role] ?? u.role}
+                        </span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-gray-600">
                       {tenant ? tenant.full_name : "—"}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <button
-                        disabled={disabled}
-                        onClick={() =>
-                          u.is_active ? setDeactivating(u) : setActive(u, true)
-                        }
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium disabled:opacity-40 ${
-                          u.is_active
-                            ? "bg-green-100 text-green-700 hover:bg-green-200"
-                            : "bg-gray-200 text-gray-600 hover:bg-gray-300"
-                        }`}
-                      >
-                        {u.is_active ? "ใช้งาน" : "ปิดใช้งาน"}
-                      </button>
+                      {isAdmin ? (
+                        <button
+                          disabled={disabled}
+                          onClick={() =>
+                            u.is_active
+                              ? setDeactivating(u)
+                              : setActive(u, true)
+                          }
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium disabled:opacity-40 ${
+                            u.is_active
+                              ? "bg-green-100 text-green-700 hover:bg-green-200"
+                              : "bg-gray-200 text-gray-600 hover:bg-gray-300"
+                          }`}
+                        >
+                          {u.is_active ? "ใช้งาน" : "ปิดใช้งาน"}
+                        </button>
+                      ) : (
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-full text-xs font-medium ${
+                            u.is_active
+                              ? "bg-green-100 text-green-700"
+                              : "bg-gray-200 text-gray-600"
+                          }`}
+                        >
+                          {u.is_active ? "ใช้งาน" : "ปิดใช้งาน"}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-gray-500">
                       {formatDate(u.created_at)}
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-center gap-2">
-                        <button
-                          onClick={() => setEditing(u)}
-                          className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
-                        >
-                          แก้ไข
-                        </button>
-                        <button
-                          onClick={() => setResetting(u)}
-                          className="px-2 py-1 text-xs rounded text-gray-600 hover:bg-gray-100"
-                        >
-                          ตั้งรหัสใหม่
-                        </button>
-                      </div>
-                    </td>
+                    {isAdmin && (
+                      <td className="px-4 py-3">
+                        <div className="flex justify-center gap-2">
+                          <button
+                            onClick={() => setEditing(u)}
+                            className="px-2 py-1 text-xs rounded text-blue-600 hover:bg-blue-50"
+                          >
+                            แก้ไข
+                          </button>
+                          <button
+                            onClick={() => setResetting(u)}
+                            className="px-2 py-1 text-xs rounded text-gray-600 hover:bg-gray-100"
+                          >
+                            ตั้งรหัสใหม่
+                          </button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

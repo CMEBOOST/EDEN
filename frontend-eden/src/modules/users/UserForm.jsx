@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "../../auth/AuthContext";
 import { useCreateUser } from "../../data/users";
 
 const inputCls =
@@ -20,11 +21,13 @@ function Field({ label, children }) {
 }
 
 function UserForm({ onClose }) {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const createUser = useCreateUser();
   const [form, setForm] = useState({
     username: "",
     password: "",
-    role: "staff",
+    role: isAdmin ? "staff" : "tenant",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -65,7 +68,9 @@ function UserForm({ onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center">
-          <h3 className="text-xl font-semibold">เพิ่มผู้ใช้</h3>
+          <h3 className="text-xl font-semibold">
+            {isAdmin ? "เพิ่มผู้ใช้" : "เพิ่มบัญชีผู้เช่า"}
+          </h3>
           <button
             type="button"
             onClick={onClose}
@@ -99,19 +104,26 @@ function UserForm({ onClose }) {
               className={inputCls}
             />
           </Field>
-          <Field label="สิทธิ์ (role)">
-            <select
-              value={form.role}
-              onChange={set("role")}
-              className={inputCls}
-            >
-              {ROLE_OPTIONS.map(([v, label]) => (
-                <option key={v} value={v}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </Field>
+          {isAdmin ? (
+            <Field label="สิทธิ์ (role)">
+              <select
+                value={form.role}
+                onChange={set("role")}
+                className={inputCls}
+              >
+                {ROLE_OPTIONS.map(([v, label]) => (
+                  <option key={v} value={v}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : (
+            <p className="text-xs text-gray-400">
+              บัญชีที่เพิ่มจะมีสิทธิ์เป็น{" "}
+              <span className="font-medium">ผู้เช่า</span>
+            </p>
+          )}
 
           <div className="flex justify-end gap-2 mt-2">
             <button

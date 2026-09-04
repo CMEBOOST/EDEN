@@ -1,9 +1,9 @@
 # EDEN — โมดูลในระบบ (Module Overview)
 
 สรุปว่าตอนนี้ระบบมีโมดูลอะไรบ้าง แต่ละโมดูล **ทำอะไรได้จริงแล้ว** และ **ยังขาดอะไร**
-อัปเดต: 2026-09-02 · อ้างอิงจากโค้ดใน `backend-eden/` และ `frontend-eden/`
+อัปเดต: 2026-09-04 · อ้างอิงจากโค้ดใน `backend-eden/` และ `frontend-eden/`
 
-ภาพรวมอื่น ๆ ดูที่ [`context.md`](../context.md) (โครงโปรเจกต์ + วิธีรัน) และ [`database_erd.drawio`](database_erd.drawio) (ERD — 9 ตาราง · มีบางจุดยังไม่ sync กับ schema ปัจจุบัน — ดูท้ายไฟล์)
+ภาพรวมอื่น ๆ ดูที่ [`context.md`](../context.md) (โครงโปรเจกต์ + วิธีรัน) และ [`database_erd.drawio`](database_erd.drawio) (ERD — 9 ตาราง · sync กับ schema ปัจจุบันแล้ว)
 
 ---
 
@@ -12,7 +12,7 @@
 | # | โมดูล | Backend | Frontend | สิทธิ์หลัก |
 |---|---|---|---|---|
 | 1 | Auth (เข้าสู่ระบบ) | `/auth/*` | `pages/Login.jsx`, `auth/` | ทุกคน |
-| 2 | Users (จัดการผู้ใช้) | `/users/*` | `modules/users/` | admin (list = staff+) |
+| 2 | Users (จัดการผู้ใช้) | `/users/*` | `modules/users/` | staff+ (staff = ดู + เพิ่ม tenant · admin = จัดการเต็ม) |
 | 3 | Profile (โปรไฟล์ตัวเอง) | `/profile/*` | `modules/profile/` | ทุก role |
 | 4 | Tenants (ผู้เช่า) | `/tenants/*` | `modules/tenants/` | staff+ (ลบ = admin) |
 | 5 | Documents (เอกสารผู้เช่า) | `/tenants/{id}/documents`, `/documents/*` | `contracts/DocumentUploader.jsx` + `contracts/ContractDocuments.jsx` | staff+ |
@@ -23,7 +23,7 @@
 | 9 | Rates (อัตราค่าน้ำ-ไฟ) | `/rates/*` | `modules/rates/` | admin (list = staff+, current = ทุกคน) |
 | 10 | Dashboard | `/dashboard/` | `modules/dashboard/` | ทุก role (ข้อมูลต่างกัน) |
 | 11 | Audit Log | `/audit-logs/` | `modules/audit/` | admin |
-| 12 | Uploads (ไฟล์) | `/upload/`, `/uploads/<name>` | `components/FileDropField.jsx` | อัป = staff+ · อ่าน = ต้องล็อกอิน |
+| 12 | Uploads (ไฟล์) | `/upload/`, `/uploads/<name>` | `components/FileDropField.jsx` | อัป = staff+ · อ่าน = ล็อกอิน + per-file ownership |
 | — | Core (auth/security/audit/storage/config) | `app/core/` | `lib/`, `auth/` | — |
 
 > **Role:** `admin` = ผู้ดูแลระบบ · `staff` = เจ้าหน้าที่หอพัก · `tenant` = ผู้เช่า
@@ -55,13 +55,13 @@
 **Frontend:** `src/modules/users/` — `Users.jsx`, `UserForm.jsx`, `UserEditModal.jsx`, `PasswordResetDialog.jsx`
 
 ทำได้ตอนนี้:
-- `POST /users/` (admin) — สร้างผู้ใช้ใหม่ (username, password, role) · username ซ้ำ → 409
+- `POST /users/` (**staff+**) — สร้างผู้ใช้ใหม่ (username, password, role) · username ซ้ำ → 409 · **staff เพิ่มได้เฉพาะ `role=tenant`** (staff/admin → 403) · admin เพิ่ม role ไหนก็ได้
 - `GET /users/` (staff+) — รายชื่อผู้ใช้ทั้งหมด (`UserOut`: user_id, username, role, is_active, avatar_url, created_at) — **ไม่มี** password_hash
 - `GET /users/{id}` (staff+) — ดูรายคน
 - `PATCH /users/{id}` (admin) — แก้ `username` / `is_active` / `avatar_url` · username ชน → 409 · ปิดบัญชีตัวเองไม่ได้ → 400
 - `PATCH /users/{id}/role` (admin) — เปลี่ยน role · เปลี่ยนของตัวเองไม่ได้ → 400
 - `PATCH /users/{id}/password` (admin) — ตั้งรหัสผ่านใหม่ให้ผู้ใช้โดยตรง (≥ 6 ตัว)
-- Frontend: หน้า `/users` (admin) — ตารางผู้ใช้ + คอลัมน์ผู้เช่าที่ผูก, เพิ่มผู้ใช้, แก้ username/avatar (พรีเซ็ต admin/male/female หรืออัปโหลด), รีเซ็ตรหัสผ่าน · `/permission` redirect มา `/users`
+- Frontend: หน้า `/users` (**staff+**) — **admin:** ตารางเต็ม (เปลี่ยน role, ปิด/เปิดบัญชี, แก้ username/avatar, รีเซ็ตรหัสผ่าน) · **staff:** ตาราง read-only + ปุ่ม "เพิ่มผู้เช่า" (ฟอร์มไม่มีช่อง role, ส่ง `tenant` เสมอ) · `/permission` redirect มา `/users`
 
 ยังไม่มี: ลบผู้ใช้ถาวร (ใช้ปิด `is_active` แทน), bulk action, ค้นหา/กรองในตาราง
 
@@ -123,8 +123,8 @@
 **Frontend:** `src/modules/contracts/` — `Contracts.jsx`, `ContractForm.jsx` (`/contracts/new`), `ContractHistory.jsx` (`/contracts/history`), `ContractDetail.jsx` (`/contracts/:id` และ `/contracts/history/:id` แบบ `readOnly`) + `ContractInfoSection.jsx` / `ChecklistSection.jsx` / `ContractDocuments.jsx` (ทั้ง 3 รับ prop `readOnly`)
 
 ทำได้ตอนนี้:
-- `POST /contracts/` (staff+) — สร้างสัญญา · เช็ค `tenant_id` มีจริง, `end_date` ≥ `start_date` · `created_by` เซ็ตจาก current user (ไม่รับจาก client) · สถานะเริ่มต้น = `draft`
-- `GET /contracts/` (staff+) — รายการ · กรองด้วย `?tenant_id=` · `?finished=true|false` (true = มี checklist `check-out` แล้ว, false = ยังไม่มี, ไม่ส่ง = ทั้งหมด)
+- `POST /contracts/` (staff+) — สร้างสัญญา · เช็ค `tenant_id` มีจริง, `end_date` ≥ `start_date` · `created_by` เซ็ตจาก current user (ไม่รับจาก client) · `status` รับได้ `draft`/`active`/`expired` (default `draft`) — `terminated` → **400** (ยุติสัญญาผ่านตรวจคืนห้องแทน)
+- `GET /contracts/` (staff+) — รายการ · กรองด้วย `?tenant_id=` · `?finished=true|false` (true = `status ∈ (expired, terminated)`, false = `status ∈ (draft, active)`, ไม่ส่ง = ทั้งหมด)
 - `GET /contracts/{id}` (staff+) — รายสัญญา
 - `PUT /contracts/{id}` (staff+) — แก้ (`ContractUpdate`)
   - **ต่อสัญญา** = แก้ `end_date`
@@ -134,18 +134,18 @@
 - ผูกห้อง (`room_id`): ตอน `POST` / `PUT` เช็คว่าห้องมีจริง (ไม่มี → 400) และไม่มีสัญญาอื่น `status ∈ (draft, active)` ครองห้องนั้นอยู่ (มี → **409**)
 - Frontend:
   - หน้า `/contracts` (staff+) — ตาราง **เฉพาะสัญญาที่ยังไม่เสร็จสิ้น** (`?finished=false`) · คลิกแถว / ปุ่ม "รายละเอียด" ไปหน้า detail · ลบ (admin) · `<RequestPanel>` · ปุ่ม "ประวัติสัญญาเช่า" (ข้างปุ่มเพิ่มสัญญา) → `/contracts/history`
-  - หน้า `/contracts/history` (`ContractHistory`, staff+) — ตารางสัญญาที่ **เสร็จสิ้นแล้ว** (มี checklist `check-out`, `?finished=true`) · คลิกแถว → `/contracts/history/:id`
+  - หน้า `/contracts/history` (`ContractHistory`, staff+) — ตารางสัญญาที่ **สิ้นสุดแล้ว** (`status` = expired/terminated, `?finished=true`) · คลิกแถว → `/contracts/history/:id`
   - หน้า `/contracts/new` ฟอร์ม 3 ส่วน (ข้อมูลสัญญา + checklist check-in + เอกสาร) · ช่อง "ห้อง" = dropdown ห้องว่าง (`/rooms/?available=true`) · เลือกห้อง → เติมค่าเช่า = `base_rent` ให้ (แก้ต่อได้)
   - หน้า `/contracts/:id` (`ContractDetail`) — ดู/แก้ข้อมูลสัญญา (inline, PUT) + จัดการ checklist ทุกใบ (เพิ่ม/แก้/ลบ) + เอกสารของผู้เช่า (เพิ่ม/ลบ) · การแก้สัญญาย้ายมาที่นี่ทั้งหมด (เดิม modal `ContractEditForm` — ลบทิ้งแล้ว)
   - หน้า `/contracts/history/:id` (`ContractDetail` prop `readOnly`) — เหมือน detail แต่ดูอย่างเดียว (ซ่อนปุ่มแก้/เพิ่ม/ลบ/ลบสัญญา/ตรวจห้องออก) · ปุ่ม "← กลับ" ไป `/contracts/history` · เก็บเป็นประวัติ
 
 ยังไม่มี / หมายเหตุ:
 - `POST /contracts/` = **atomic** — รับ `checkin_items` + `tenant_signature` + `documents` ใน body เดียว สร้างพร้อมกันในทรานแซกชันเดียว (fail = rollback หมด) · `created_by` เซ็ตจาก current user
-- `POST /contracts/run-expire` (admin) — ตั้งสัญญา `active` ที่เลย `end_date` เป็น `expired` คืน `{expired: N}` (เอาไป cron วันละครั้ง)
+- `POST /contracts/run-expire` (admin) — ตั้งสัญญา `active` ที่เลย `end_date` เป็น `expired` คืน `{expired: N}` · idempotent · เรียกอัตโนมัติผ่าน `scripts/expire-contracts.sh` + host cron
 - constraint กันข้อมูลพัง: 1 ห้อง มีสัญญา draft/active ได้ใบเดียว (partial unique index) · CHECK `end_date >= start_date`, `rent/deposit >= 0`
 - เอกสารในหน้า detail เป็นเอกสารระดับ **ผู้เช่า** (ใช้ร่วมทุกสัญญาของผู้เช่ารายนั้น) — ยังไม่ผูก `contract_id`
-- `expired`: ยังไม่มี auto-scheduler ในแอป — มี endpoint `POST /contracts/run-expire` (admin) แล้ว ต้องตั้ง cron เรียกเอง
-- "เสร็จสิ้น" ดูจาก **มี checklist `check-out`** ไม่ได้ดู `status` — สัญญาที่ admin ตั้ง `terminated` ด้วยมือแต่ยังไม่ได้ตรวจคืนห้อง จะยังอยู่หน้า `/contracts` · พอเข้าประวัติแล้วแก้ไม่ได้ (ต้องผ่าน DB/API)
+- `expired`: ไม่มี in-app scheduler — `scripts/expire-contracts.sh` (→ `expire_contracts.py` → `contracts_crud.expire_overdue`) ตั้งผ่าน host cron วันละครั้ง
+- "เสร็จสิ้น" (`?finished=`) ดูจาก `status` — `expired`/`terminated` = เข้าหน้าประวัติ · `draft`/`active` = หน้า `/contracts`
 - บันทึก `check-out` แล้วสัญญาจะเป็น `terminated` เสมอ (ยกเว้นเดิมเป็น `expired` → คงไว้) → หน้าประวัติจะไม่มีสัญญาสถานะ `active` เหลือ
 
 ---
@@ -200,19 +200,20 @@
 ทำได้ตอนนี้:
 - `POST /contract-requests/` — แจ้งความจำนง (`contract_id`, `request_type`: `renew`|`terminate`, `tenant_note`, `preferred_date?`)
   - ผู้เช่าแจ้งได้เฉพาะสัญญาของตัวเอง (ไม่ใช่ → 403)
+  - สัญญาต้อง `status = active` (draft/expired/terminated → 400)
   - มีคำขอที่ค้างอยู่แล้วสำหรับสัญญานั้น → 409
 - `GET /contract-requests/` — ผู้เช่าเห็นเฉพาะของตัวเอง · staff+ เห็นทั้งหมด (กรอง `?status=`)
 - `GET /contract-requests/{id}` — ผู้เช่าเจ้าของ หรือ staff+
 - `PATCH /contract-requests/{id}` (staff+) — ดำเนินการ: `status`, `staff_note`, `preferred_date`, `damage_total`
-  - ปิดงาน (`completed`) ของคำขอ `terminate` → ต้องมี checklist `check-out` ของสัญญานั้นก่อน (ไม่มี → 400)
-  - บันทึกผู้ดำเนินการ (`handled_by`) + เวลา (`handled_at`)
+  - **state machine (lenient):** `completed`/`rejected` = terminal · `pending`/`accepted` → `accepted`/`rejected`/`completed` · transition ผิด → 400
+  - ปิดงาน (`completed`):
+    - `renew` → **ขยาย `contract.end_date`** = `preferred_date` (ที่ส่งใน PATCH หรือของ request) · ไม่มี → 400 · ≤ end_date เดิม → 400
+    - `terminate` → ต้องมี checklist `check-out` ก่อน (ไม่มี → 400) · ตั้ง `contract.status = terminated` · `damage_total` = ผลรวม `cost` ของ item ใน check-out checklist ล่าสุด (ส่งค่าเองใน PATCH = override)
+  - บันทึก `handled_by` + `handled_at` ทุก transition ที่ออกจาก `pending`
 - `DELETE /contract-requests/{id}` — ยกเลิกคำขอ
   - ผู้เช่า: ยกเลิกได้เฉพาะของตัวเองที่ `status=pending` เท่านั้น
   - staff+: ลบได้ทุกอัน
-- สถานะ: `pending` → `accepted` / `rejected` / `completed`
-- Frontend: ผู้เช่ากดแจ้งจาก Dashboard · staff เห็น `RequestPanel` บนหน้า `/contracts` (รับเรื่อง / ต่อสัญญา / ปฏิเสธ) · ยุติสัญญาไปที่หน้าตรวจห้องออก `/contracts/:id/checkout`
-
-หมายเหตุ: "ต่อสัญญา" จริง ๆ (ขยาย `end_date`) ยังเป็นการกระทำแยกบน `/contracts/{id}` — request เป็นตัวติดตามคำขอ · ส่วน "ยุติ" ตอนนี้เกิดอัตโนมัติเมื่อบันทึก checklist `check-out` (ดูโมดูล 7)
+- Frontend: ผู้เช่ากดแจ้งจาก Dashboard · staff เห็น `RequestPanel` บนหน้า `/contracts` — "รับเรื่อง / ต่อสัญญา" (`RenewDialog`, PATCH ครั้งเดียว) / "ตรวจสภาพห้องออก" (`/contracts/:id/checkout`) / "ปฏิเสธ"
 
 ---
 
@@ -225,8 +226,8 @@
 - `POST /rates/` (admin) — เพิ่มอัตรา (`type`: `water`|`electric`, `rate_value`, `effective_date`)
   - ชน `(type, effective_date)` เดิม → **409** `{message, existing_rate_id}` (มี `UNIQUE` constraint)
 - `GET /rates/` (staff+) — รายการทั้งหมด (กรอง `?type=`)
-- `GET /rates/current` (ทุก role ที่ล็อกอิน) — อัตราที่มีผล ณ วันนี้ หรือ `?date=` → `{water: {...}|null, electric: {...}|null}`
-- `GET /rates/{id}` — รายการเดียว
+- `GET /rates/current` (staff+) — อัตราที่มีผล ณ วันนี้ หรือ `?date=` → `{water: {...}|null, electric: {...}|null}`
+- `GET /rates/{id}` (staff+) — รายการเดียว
 - `PUT /rates/{id}` (admin) — แก้ · ย้ายเข้า slot `(type, effective_date)` ที่มีแล้ว → 409
 - `DELETE /rates/{id}` (admin) — ลบ
 - โมเดล = **effective-dated history**: แต่ละแถว = "ตั้งแต่วันนี้ เรทคือ X" · อัตราปัจจุบัน = `effective_date` ล่าสุดที่ ≤ วันนี้ (`get_effective_rate`)
@@ -268,16 +269,17 @@
 
 ## 12. Uploads — ไฟล์แนบ
 
-**Backend:** `app/core/storage.py`, `routers.py` (`upload_router`), route `serve_upload` + `get_user_for_file` (`app/core/auth.py`) ใน `app/main.py`
+**Backend:** `app/core/storage.py`, `routers.py` (`upload_router`), route `serve_upload` + `get_user_for_file` (`app/core/auth.py`) + `app/crud/file_crud.py` (`user_may_access`) ใน `app/main.py`
 **Frontend:** `src/components/FileDropField.jsx`, `src/lib/api.js` (`apiUpload`, `fileUrl`)
 
 ทำได้ตอนนี้:
 - `POST /upload/` (staff+) — อัปโหลดไฟล์ 1 ไฟล์ (multipart `file`) → `{url, filename}`
   - รองรับ `.jpg .jpeg .png .webp .gif .pdf` · ≤ 10 MB · ตั้งชื่อใหม่เป็น UUID
 - `GET /uploads/<name>` — **ต้องล็อกอิน** · token ทาง `Authorization` header หรือ `?token=<JWT>` (`<img>`/`<a>` แนบ header ไม่ได้ → `fileUrl()` ต่อ `?token=` ให้) · guard path traversal
+- **per-file ownership** (`file_crud.user_may_access`) — staff/admin เห็นทุกไฟล์ · tenant เห็นเฉพาะ avatar ตัวเอง + ไฟล์ที่ผูกกับ record ของตัวเอง (`tenant_documents.file_url` / `contracts.contract_file_url` / `contract_checklists.photo_urls` ของสัญญาตัวเอง) · ไม่ผ่าน → **404** (ไม่เปิดเผยว่ามีไฟล์)
 - เก็บบนดิสก์ผ่าน bind mount `./backend-eden/uploads` (เห็นบน host)
 
-ยังไม่มี / หมายเหตุ: ยังไม่เช็ค **per-file ownership** (ผู้ล็อกอินใด ๆ ที่รู้ชื่อไฟล์ = โหลดได้ · ชื่อเป็น uuid4) · token อยู่ใน URL (browser history / server log) — tradeoff ที่ยอมรับสำหรับ dev · ยังไม่มีการลบไฟล์กำพร้า · prod ควรย้ายไป object storage / named volume
+ยังไม่มี / หมายเหตุ: token อยู่ใน URL (browser history / server log) — tradeoff ที่ยอมรับสำหรับ dev · ยังไม่มีการลบไฟล์กำพร้า · prod ควรย้ายไป object storage / named volume
 
 ---
 
@@ -295,6 +297,8 @@
 | `storage.py` | `save_upload()` — ตรวจนามสกุล/ขนาด, เซฟลง `uploads/` |
 
 > **ลำดับ middleware ใน `app/main.py`** (นอก→ใน): `CORSMiddleware` → `ErrorHandlerMiddleware` → `AuditMiddleware` → router · CORS ต้อง add ทีหลังสุด (ชั้นนอกสุด) เพื่อให้ response ที่เป็น error ได้ header CORS ครบ · มี `@app.exception_handler(IntegrityError)` → 409 ด้วย
+
+> **API convention:** `POST` ที่สร้าง resource คืน **201** (`/users/` `/tenants/` `/tenants/{id}/documents` `/upload/` `/contracts/` `/contracts/{id}/checklists` `/rates/` `/contract-requests/`) — `POST /auth/login`, `/contracts/run-expire`, `/profile/avatar` เป็น action คืน 200 · path param `{contract_id:int}` → path ที่ไม่ใช่ int (เช่น `/contracts/history`) ตอบ 404 ไม่ใช่ 422
 
 ### Backend อื่น ๆ
 - `app/database.py` — engine / `SessionLocal` / `get_db` / `Base` (อ่าน `DATABASE_URL`)
@@ -315,7 +319,7 @@
 | `data/*` | ชั้น data (TanStack Query) ต่อ domain — `keys.js` (`qk` factory) + `tenants/users/contracts/checklists/documents/rates/rooms/requests/dashboard/profile/audit.js` แต่ละไฟล์ = query hook + mutation hook + invalidate (`useTenants()`, `useCreateContract()` ฯลฯ) · ทุกหน้าเลิก fetch ใน `useEffect` |
 | `auth/AuthContext.jsx` | `useAuth()` — `user` / `login` / `logout` / `refreshUser` |
 | `auth/RequireAuth.jsx` | กัน route ตามสถานะล็อกอิน + role |
-| `layout/Sidebar.jsx` | เมนูข้าง — แสดงตาม role (staff เห็นผู้เช่า/สัญญา · admin เห็นเพิ่ม อัตราค่าบริการ/จัดการผู้ใช้/Audit Log) |
+| `layout/Sidebar.jsx` | เมนูข้าง — แสดงตาม role (staff เห็นผู้เช่า/สัญญา/จัดการผู้ใช้ · admin เห็นเพิ่ม อัตราค่าบริการ/Audit Log) |
 | `layout/Topbar.jsx` | breadcrumb / ชื่อหน้าปัจจุบัน (ซ้าย) + user dropdown (👤 โปรไฟล์ / ⏻ ออกจากระบบ) |
 | `layout/breadcrumbs.js` | `crumbsFor(pathname)` — map path → รายการ breadcrumb |
 | `components/ConfirmDialog.jsx` | กล่องยืนยันการทำงาน |
@@ -331,20 +335,19 @@
 - **Rooms** — มีตาราง `rooms` แล้ว (demo, seed คงที่) แต่ยังไม่มีหน้าจัดการห้อง / สถานะ "ปิดปรับปรุง"
 - **บิล / ใบแจ้งหนี้ / มิเตอร์น้ำ-ไฟ** — มีแค่ "อัตรา" ยังไม่มีการออกบิล
 - ~~**การเข้ารหัสบัตรประชาชนจริง**~~ — ✅ `national_id_encrypted` เข้ารหัส Fernet at rest แล้ว (`EncryptedStr`, migration `671e1a7f8221`)
-- **สถานะสัญญาอัตโนมัติ** — มี `POST /contracts/run-expire` แล้ว แต่ยังต้องตั้ง cron เอง (ไม่มี scheduler ในแอป)
-- **Tests** — ยังไม่มี unit/integration test
+- ~~**สถานะสัญญาอัตโนมัติ**~~ — ✅ `scripts/expire-contracts.sh` (→ `expire_contracts.py`) ตั้งผ่าน host cron · ไม่มี in-app scheduler (เจตนา)
+- ~~**Tests**~~ — ✅ pytest (backend, DB `eden_test`) + Vitest/RTL (frontend) — infra + smoke + characterization suite · รันใน CI
 - ~~**State management ฝั่ง frontend**~~ — ✅ ใช้ TanStack Query v5 แล้ว (ชั้น hook ต่อ domain ใน `src/data/*`, cache + invalidate อัตโนมัติ, เลิก fetch ใน `useEffect`)
 - ~~**Production build**~~ — ✅ `docker-compose.prod.yml` — frontend build → nginx (SPA fallback + proxy `/api/` ไป backend, single origin) · backend `uvicorn --workers` · migration = service `migrate` one-shot · uploads = named volume · backend/postgres ไม่ expose · seed admin: `... exec backend uv run python create_admin.py` · **ยังไม่ทำ:** TLS/reverse-proxy ชั้นนอก, log aggregation
 - ~~**Backup / pgadmin**~~ — ✅ `scripts/backup.sh` / `scripts/restore.sh` (pg_dump `-Fc` + rotation, cron ตัวอย่างใน README) · pgadmin → compose profile `tools`
 
 ---
 
-## ERD (`database_erd.drawio`) — จุดที่ยังไม่ sync
+## ERD (`database_erd.drawio`)
 
-โครงตาราง/คอลัมน์/FK/enum ตรงกับ `models.py` แล้ว · ที่ยังต้องเพิ่มในไฟล์ (แก้มือใน diagrams.net):
-
-- `contract_requests.tenant_note` — ERD เป็น `NULL` แต่ model เป็น **NOT NULL**
-- `tenants.user_id` — ตอนนี้มี **UNIQUE** (`uq_tenants_user_id`, 1 บัญชี ↔ 1 ผู้เช่า)
-- `contracts` — partial unique index `uq_contract_room_active` (1 ห้อง ↔ สัญญา draft/active ใบเดียว) · CHECK `ck_contract_dates` (end ≥ start) · CHECK `ck_contract_amounts` (rent/deposit ≥ 0)
-- `rate_configs` — CHECK `ck_rate_value_nonneg`
-- `tenants.national_id_encrypted` — ยังเป็น `varchar(255)` แต่เก็บ **Fernet ciphertext** (เข้ารหัสจริงแล้ว)
+sync กับ `models.py` แล้ว (9 ตาราง · คอลัมน์ / FK / enum / constraint):
+- `tenants.user_id` **UNIQUE** (`uq_tenants_user_id`)
+- `contract_requests.tenant_note` **NOT NULL**
+- `tenants.national_id_encrypted` = Fernet ciphertext (คอลัมน์ยังเป็น `varchar(255)`)
+- `contracts` — `uq_contract_room_active` (partial: room_id, status ∈ draft/active) · CHECK `ck_contract_dates` · `ck_contract_amounts` (หมายเหตุอยู่แถว `updated_at`)
+- `rate_configs` — `uq_rate_type_date` · CHECK `ck_rate_value_nonneg` (หมายเหตุอยู่แถว `updated_at`)

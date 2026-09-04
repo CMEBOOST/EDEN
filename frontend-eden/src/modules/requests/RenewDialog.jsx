@@ -1,14 +1,12 @@
 import { useEffect, useState } from "react";
 import { formatDate } from "../../lib/datetime";
-import { useUpdateContract } from "../../data/contracts";
 import { useUpdateRequest } from "../../data/requests";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
 
-// รับเรื่องต่อสัญญา — ขยาย end_date ของสัญญาเดิม แล้วปิดคำขอ
+// รับเรื่องต่อสัญญา — ปิดคำขอ (completed) แล้ว backend ขยาย end_date ของสัญญาให้
 function RenewDialog({ request, onClose }) {
-  const updateContract = useUpdateContract();
   const updateRequest = useUpdateRequest();
   const currentEnd = request.contract_end_date;
   const [endDate, setEndDate] = useState(request.preferred_date || "");
@@ -35,13 +33,13 @@ function RenewDialog({ request, onClose }) {
     setSubmitting(true);
     setError(null);
     try {
-      await updateContract.mutateAsync({
-        id: request.contract_id,
-        body: { end_date: endDate },
-      });
       await updateRequest.mutateAsync({
         id: request.request_id,
-        body: { status: "completed", staff_note: note.trim() || null },
+        body: {
+          status: "completed",
+          preferred_date: endDate,
+          staff_note: note.trim() || null,
+        },
       });
       onClose?.();
     } catch (err) {

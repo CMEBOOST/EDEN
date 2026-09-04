@@ -18,10 +18,40 @@ def test_admin_dashboard_has_rent_total(client, auth_client, db):
         "contracts_active",
         "contracts_draft",
         "requests_pending",
+        "contracts_expired",
+        "contracts_terminated",
+        "rooms_total",
+        "rooms_vacant",
     }
     assert body["counts"]["contracts_active"] == 1
     assert body["counts"]["contracts_draft"] == 1
     assert body["monthly_rent_total"] == 5000
+
+
+def test_admin_dashboard_aggregates(client, auth_client, db):
+    auth_client(models.Role.admin)
+    this_month = datetime.date.today().replace(day=1)
+    make_contract(
+        db, room_id=101, status=models.ContractStatus.active, start_date=this_month
+    )
+    make_contract(db, room_id=None, status=models.ContractStatus.expired)
+    make_contract(db, room_id=None, status=models.ContractStatus.terminated)
+
+    body = client.get("/dashboard/").json()
+    assert body["status_breakdown"] == {
+        "draft": 0,
+        "active": 1,
+        "expired": 1,
+        "terminated": 1,
+    }
+    assert body["counts"]["rooms_total"] == 40
+    assert body["counts"]["rooms_vacant"] == 39
+    assert body["occupancy_rate"] == 2.5
+    monthly = body["new_contracts_monthly"]
+    assert len(monthly) == 6
+    assert monthly[-1]["month"] == this_month.strftime("%Y-%m")
+    assert monthly[-1]["count"] == 1
+    assert monthly[0]["count"] == 0
 
 
 def test_staff_dashboard_omits_rent_total(client, auth_client, db):

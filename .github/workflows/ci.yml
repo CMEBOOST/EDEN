@@ -48,6 +48,11 @@ jobs:
           DATABASE_URL: postgresql://postgres:admin123@localhost:5432/EDEN_DB
         run: uv run alembic upgrade head
 
+      - name: Test (pytest)
+        env:
+          DATABASE_URL: postgresql://postgres:admin123@localhost:5432/EDEN_DB
+        run: uv run pytest
+
       - name: Validate compose files + scripts
         working-directory: ${{ github.workspace }}
         env:
@@ -55,7 +60,7 @@ jobs:
         run: |
           docker compose config -q
           docker compose -f docker-compose.prod.yml config -q
-          bash -n scripts/backup.sh scripts/restore.sh
+          bash -n scripts/backup.sh scripts/restore.sh scripts/expire-contracts.sh
 
   frontend:
     runs-on: ubuntu-latest
@@ -79,6 +84,9 @@ jobs:
 
       - name: Format check (prettier)
         run: npx prettier --check .
+
+      - name: Test (vitest)
+        run: npx vitest run
 
       - name: Build
         run: npx vite build

@@ -132,7 +132,7 @@ function App() {
             <Route
               path="/users"
               element={
-                <RequireAuth roles={["admin"]}>
+                <RequireAuth roles={["admin", "staff"]}>
                   <Users />
                 </RequireAuth>
               }

@@ -1,0 +1,15 @@
+# normalize line endings — เก็บใน repo เป็น LF เสมอ (ดับ warning "LF will be replaced by CRLF" บน Windows)
+* text=auto eol=lf
+
+# สคริปต์ที่รันใน Linux container — ต้องเป็น LF
+*.sh text eol=lf
+
+# ไฟล์ binary — อย่าแตะ line ending
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.dump binary

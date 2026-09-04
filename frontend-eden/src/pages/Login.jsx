@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import logoEden from "../../assets/logoEden.webp";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
@@ -37,9 +38,11 @@ function Login() {
         className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 w-full max-w-sm flex flex-col gap-4"
       >
         <div className="text-center">
-          <div className="inline-block border border-gray-400 px-6 py-1 rounded tracking-widest text-sm font-bold">
-            EDEN PLACE
-          </div>
+          <img
+            src={logoEden}
+            alt="EDEN PLACE"
+            className="inline-block h-14 w-auto rounded-lg object-contain"
+          />
           <p className="text-gray-500 text-sm mt-3">เข้าสู่ระบบจัดการหอพัก</p>
         </div>
 

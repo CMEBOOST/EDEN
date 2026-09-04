@@ -18,7 +18,7 @@ const statusLabel = {
   terminated: "ยกเลิก",
 };
 
-// หน้าประวัติสัญญาเช่า — เฉพาะสัญญาที่ทำ "ตรวจคืนห้อง (check-out)" แล้ว (เสร็จสิ้นกระบวนการ)
+// หน้าประวัติสัญญาเช่า — เฉพาะสัญญาที่สิ้นสุดแล้ว (status = หมดอายุ / ยกเลิก)
 function ContractHistory() {
   const navigate = useNavigate();
   const {
@@ -61,7 +61,8 @@ function ContractHistory() {
         <div>
           <h2 className="text-3xl">ประวัติสัญญาเช่า</h2>
           <p className="text-gray-500">
-            สัญญาที่ตรวจคืนห้องแล้ว {!loading && `(${contracts.length})`}
+            สัญญาที่สิ้นสุดแล้ว (หมดอายุ / ยกเลิก){" "}
+            {!loading && `(${contracts.length})`}
           </p>
         </div>
       </div>

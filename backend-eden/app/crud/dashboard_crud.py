@@ -4,6 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ..models import models
+from . import room_crud
 
 
 def counts(db: Session) -> dict:
@@ -66,6 +67,60 @@ def monthly_rent_total(db: Session) -> float:
         .scalar()
     )
     return float(total or 0)
+
+
+def status_breakdown(db: Session) -> dict[str, int]:
+    """นับสัญญาแยกตามสถานะ — คืนครบทุกสถานะ (เติม 0 ให้ที่ไม่มี)"""
+    rows = (
+        db.query(models.Contracts.status, func.count(models.Contracts.contract_id))
+        .group_by(models.Contracts.status)
+        .all()
+    )
+    counts = {s.value: 0 for s in models.ContractStatus}
+    for status, n in rows:
+        counts[status.value if hasattr(status, "value") else status] = n
+    return counts
+
+
+def room_stats(db: Session) -> dict[str, int]:
+    """สถานะห้อง คำนวณสดจาก contracts (draft/active = ห้องไม่ว่าง)"""
+    rows = room_crud.get_rooms(db)
+    total = len(rows)
+    occupied = sum(1 for _, contract_id in rows if contract_id is not None)
+    return {"total": total, "occupied": occupied, "vacant": total - occupied}
+
+
+def new_contracts_monthly(db: Session, months: int = 6) -> list[dict]:
+    """จำนวนสัญญาที่เริ่ม (start_date) ในแต่ละเดือน ย้อนหลัง `months` เดือนถึงเดือนปัจจุบัน"""
+    today = datetime.date.today()
+    buckets: list[tuple[int, int]] = []
+    y, m = today.year, today.month
+    for _ in range(months):
+        buckets.append((y, m))
+        m -= 1
+        if m == 0:
+            y, m = y - 1, 12
+    buckets.reverse()
+    earliest = datetime.date(buckets[0][0], buckets[0][1], 1)
+
+    rows = (
+        db.query(
+            func.extract("year", models.Contracts.start_date),
+            func.extract("month", models.Contracts.start_date),
+            func.count(models.Contracts.contract_id),
+        )
+        .filter(models.Contracts.start_date >= earliest)
+        .group_by(
+            func.extract("year", models.Contracts.start_date),
+            func.extract("month", models.Contracts.start_date),
+        )
+        .all()
+    )
+    found = {(int(yr), int(mo)): int(n) for yr, mo, n in rows}
+    return [
+        {"month": f"{yr:04d}-{mo:02d}", "count": found.get((yr, mo), 0)}
+        for yr, mo in buckets
+    ]
 
 
 def tenant_home(db: Session, user_id: int) -> dict:

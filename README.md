@@ -68,6 +68,18 @@ cd backend-eden  && uv run ruff format     # Ruff (python) · เช็ค: uv r
 
 VSCode: format-on-save เปิดไว้แล้ว (`.vscode/settings.json`) — ลง extension `esbenp.prettier-vscode` + `charliermarsh.ruff`
 
+## รันเทสต์
+
+```bash
+# backend — ต้องมี postgres รันอยู่ (docker compose up -d postgres)
+cd backend-eden && uv run pytest            # สร้าง DB แยก `eden_test` เอง · coverage สรุปท้าย
+
+# frontend
+cd frontend-eden && npm test                # Vitest · watch: npm run test:watch · coverage: npm run test:cov
+```
+
+CI รันทั้งสองอัตโนมัติ (`.github/workflows/ci.yml`). มี characterization suite ครอบ RBAC / contract / request workflow / encryption / uploads / audit / dashboard (backend) + invalidation rules / api wrapper / RequireAuth (frontend). เทสต์ที่จงใจ lock พฤติกรรมที่เป็น bug มีคอมเมนต์ `# QUIRK` — `grep -rn QUIRK backend-eden/tests` = checklist งานปิดช่องโหว่
+
 ## รันแบบ production
 
 ```bash
@@ -103,4 +115,23 @@ scripts/restore.sh backups/eden_<ts>.dump -f docker-compose.prod.yml  # prod
 ```
 # Windows — Task Scheduler → Action:
 "C:\Program Files\Git\bin\bash.exe" -lc "cd /c/Users/USER/Desktop/EDEN && scripts/backup.sh"
+```
+
+## ตั้งสัญญาหมดอายุอัตโนมัติ
+
+`scripts/expire-contracts.sh` — ตั้งสัญญา `active` ที่เลย `end_date` เป็น `expired` (เท่ากับกด `POST /contracts/run-expire`) · idempotent · ต้องมี backend container รันอยู่
+
+```bash
+scripts/expire-contracts.sh                             # dev
+scripts/expire-contracts.sh -f docker-compose.prod.yml  # prod
+```
+
+**ตั้ง cron (ทุกวัน ตี 1):**
+```bash
+# Linux — crontab -e
+0 1 * * * cd /path/to/EDEN && scripts/expire-contracts.sh -f docker-compose.prod.yml >> backups/expire.log 2>&1
+```
+```
+# Windows — Task Scheduler → Action:
+"C:\Program Files\Git\bin\bash.exe" -lc "cd /c/Users/USER/Desktop/EDEN && scripts/expire-contracts.sh"
 ```

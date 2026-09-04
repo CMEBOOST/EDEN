@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { formatDate } from "../../lib/datetime";
 import { useRates, useCurrentRates, useDeleteRate } from "../../data/rates";
 import ConfirmDialog from "../../components/ConfirmDialog";
+import StatCard from "../../components/StatCard";
 import RateForm from "./RateForm";
 
 const typeLabel = { water: "ค่าน้ำ", electric: "ค่าไฟ" };
@@ -74,29 +75,27 @@ function Rates() {
       {/* การ์ดสรุปอัตราปัจจุบัน */}
       <div className="grid grid-cols-2 gap-3">
         {["water", "electric"].map((t) => (
-          <div
+          <StatCard
             key={t}
-            className="border border-gray-200 rounded-xl p-4 flex flex-col gap-1"
-          >
-            <span className="text-sm text-gray-500">
-              {typeLabel[t]} — อัตราปัจจุบัน
-            </span>
-            {current[t] ? (
-              <>
-                <span className="text-2xl font-semibold">
+            label={`${typeLabel[t]} — อัตราปัจจุบัน`}
+            value={
+              current[t] ? (
+                <>
                   {fmtBaht(current[t].rate_value)}{" "}
                   <span className="text-sm font-normal text-gray-400">
                     บาท/หน่วย
                   </span>
-                </span>
-                <span className="text-xs text-gray-400">
-                  มีผลตั้งแต่ {formatDate(current[t].effective_date)}
-                </span>
-              </>
-            ) : (
-              <span className="text-gray-400 text-sm">ยังไม่ตั้ง</span>
-            )}
-          </div>
+                </>
+              ) : (
+                "ยังไม่ตั้ง"
+              )
+            }
+            hint={
+              current[t]
+                ? `มีผลตั้งแต่ ${formatDate(current[t].effective_date)}`
+                : undefined
+            }
+          />
         ))}
       </div>
 
