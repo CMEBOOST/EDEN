@@ -10,6 +10,7 @@ docker-compose.yml
 .mypy_cache
 .ruff_cache
 *.log
+tests/
 
 # อย่าฝังลงใน image — คีย์ลับส่งผ่าน env_file ตอน compose up
 .env

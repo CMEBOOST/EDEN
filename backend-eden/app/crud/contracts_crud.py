@@ -1,6 +1,5 @@
 import datetime
 
-from sqlalchemy import and_, exists
 from sqlalchemy.orm import Session
 
 from ..models import models
@@ -46,14 +45,13 @@ def get_contracts(
         query = query.filter(models.Contracts.tenant_id == tenant_id)
 
     if finished is not None:
-        # "เสร็จสิ้น" = มี checklist ตรวจคืนห้อง (check-out) อย่างน้อย 1 ใบ
-        has_checkout = exists().where(
-            and_(
-                models.ContractChecklist.contract_id == models.Contracts.contract_id,
-                models.ContractChecklist.type == models.ChecklistType.check_out,
-            )
+        # "เสร็จสิ้น" = สัญญาจบ lifecycle แล้ว (หมดอายุ / ยกเลิก)
+        done = (models.ContractStatus.expired, models.ContractStatus.terminated)
+        query = query.filter(
+            models.Contracts.status.in_(done)
+            if finished
+            else models.Contracts.status.notin_(done)
         )
-        query = query.filter(has_checkout if finished else ~has_checkout)
 
     return query.offset(skip).limit(limit).all()
 
