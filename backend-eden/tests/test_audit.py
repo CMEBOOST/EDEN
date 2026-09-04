@@ -21,7 +21,7 @@ def test_write_2xx_creates_one_row(client, auth_client, db):
             "email": "k@example.com",
         },
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     rows = db.query(models.AuditLog).order_by(models.AuditLog.log_id.desc()).all()
     assert _log_count(db) == before + 1
     assert rows[0].user_id == me.user_id
@@ -77,7 +77,7 @@ def test_audit_logs_shape_and_filters(client, auth_client, db):
             "email": "x@example.com",
         },
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     rows = client.get("/audit-logs/").json()
     assert isinstance(rows, list) and rows
     assert set(rows[0]) == {"log_id", "action", "created_at", "user_id", "username"}

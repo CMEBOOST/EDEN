@@ -41,7 +41,7 @@ def test_tenant_creates_on_own_contract(client, as_user, db):
             "tenant_note": "ต่อ",
         },
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     assert res.json()["status"] == "pending"
 
 
@@ -72,7 +72,7 @@ def test_staff_can_request_any_contract(client, auth_client, db):
             "tenant_note": "x",
         },
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
 
 
 def test_create_missing_contract_404(client, auth_client):
@@ -109,7 +109,7 @@ def test_one_open_request_per_contract(client, auth_client, db):
             "tenant_note": "x",
         },
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
 
 
 def test_create_request_requires_active_contract(client, auth_client, db):
@@ -133,7 +133,7 @@ def test_create_request_requires_active_contract(client, auth_client, db):
     res = client.post(
         "/contract-requests/", json={**body, "contract_id": c.contract_id}
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     assert res.json()["preferred_date"] is None
 
 

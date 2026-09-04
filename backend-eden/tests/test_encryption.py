@@ -30,7 +30,7 @@ def test_post_tenant_encrypts_at_rest_and_get_decrypts(client, auth_client, db):
             "national_id_encrypted": NID,
         },
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     tid = res.json()["tenant_id"]
 
     assert client.get(f"/tenants/{tid}").json()["national_id_encrypted"] == NID

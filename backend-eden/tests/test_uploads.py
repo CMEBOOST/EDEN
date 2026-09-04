@@ -24,7 +24,7 @@ def test_post_upload_returns_uuid_name(client, auth_client):
     res = client.post(
         "/upload/", files={"file": ("photo.JPG", b"\xff\xd8\xff", "image/jpeg")}
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     body = res.json()
     assert body["url"].startswith("/uploads/")
     name = body["url"].removeprefix("/uploads/")

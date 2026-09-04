@@ -16,7 +16,7 @@ def test_default_type_is_check_in(client, auth_client, db):
     auth_client(models.Role.staff)
     c = make_contract(db, room_id=None)
     res = client.post(f"/contracts/{c.contract_id}/checklists", json={"items": []})
-    assert res.status_code == 200
+    assert res.status_code == 201
     assert res.json()["type"] == "check-in"
 
 
@@ -63,7 +63,7 @@ def test_checkout_leaves_expired_status_untouched(client, auth_client, db):
         f"/contracts/{c.contract_id}/checklists",
         json={"type": "check-out", "items": []},
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     db.refresh(c)
     assert c.status == models.ContractStatus.expired
 
@@ -77,7 +77,7 @@ def test_multiple_checkout_checklists_allowed(client, auth_client, db):
                 f"/contracts/{c.contract_id}/checklists",
                 json={"type": "check-out", "items": []},
             ).status_code
-            == 200
+            == 201
         )
     assert (
         db.query(models.ContractChecklist).filter_by(contract_id=c.contract_id).count()

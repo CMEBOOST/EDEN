@@ -24,13 +24,13 @@ def _payload(tenant_id, **over):
 
 
 # ── create ────────────────────────────────────────────────────────────────────
-def test_create_returns_200_not_201_contract_only(client, auth_client, db):
+def test_create_returns_201_contract_only(client, auth_client, db):
     me = auth_client(models.Role.staff)
     tenant = make_tenant(db)
 
     res = client.post("/contracts/", json=_payload(tenant.tenant_id, room_id=105))
 
-    assert res.status_code == 200  # QUIRK: 200 ไม่ใช่ 201
+    assert res.status_code == 201
     body = res.json()
     assert body["created_by"] == me.user_id
     assert body["status"] == "draft"
@@ -83,7 +83,7 @@ def test_create_documents_attach_to_tenant(client, auth_client, db):
             documents=[{"doc_type": "id_card", "file_url": "/uploads/x.png"}],
         ),
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     doc = db.query(models.TenantDocument).filter_by(tenant_id=tenant.tenant_id).one()
     assert doc.uploaded_by == me.user_id
 
@@ -95,7 +95,7 @@ def test_create_rejects_terminated_status(client, auth_client, db):
     # draft/active/expired — สร้างได้ (backfill ข้อมูลเก่า / ผู้เช่าเข้าอยู่แล้ว)
     for st in ("active", "expired"):
         res = client.post("/contracts/", json=_payload(tenant.tenant_id, status=st))
-        assert res.status_code == 200
+        assert res.status_code == 201
         assert res.json()["status"] == st
 
     # terminated — ตายตั้งแต่เกิด ไม่มีเหตุผล → 400
@@ -127,7 +127,7 @@ def test_create_validation_paths(client, auth_client, db):
                 tenant.tenant_id, start_date="2026-06-01", end_date="2026-06-01"
             ),
         ).status_code
-        == 200
+        == 201
     )
     assert (
         client.post(
@@ -142,7 +142,7 @@ def test_create_room_busy_409(client, auth_client, db):
     t1, t2 = make_tenant(db), make_tenant(db)
     assert (
         client.post("/contracts/", json=_payload(t1.tenant_id, room_id=105)).status_code
-        == 200
+        == 201
     )
     res = client.post("/contracts/", json=_payload(t2.tenant_id, room_id=105))
     assert res.status_code == 409
@@ -156,7 +156,7 @@ def test_create_room_not_checked_when_null(client, auth_client, db):
     # room_id=None → ไม่เช็คห้องว่าง
     assert (
         client.post("/contracts/", json=_payload(t.tenant_id, room_id=None)).status_code
-        == 200
+        == 201
     )
 
 
@@ -212,10 +212,10 @@ def test_finished_filter_by_lifecycle_status(client, auth_client, db):
     }
 
 
-def test_contracts_history_is_422_not_a_route(client, auth_client):
+def test_contracts_non_int_id_is_404(client, auth_client):
     auth_client(models.Role.staff)
-    # QUIRK: /contracts/history ไม่ใช่ endpoint — ชน /contracts/{id} แล้ว int parse fail
-    assert client.get("/contracts/history").status_code == 422
+    # {contract_id:int} converter → path ที่ไม่ใช่ int ไม่ match route → 404 (ไม่ใช่ 422)
+    assert client.get("/contracts/history").status_code == 404
 
 
 # ── run-expire ───────────────────────────────────────────────────────────────
@@ -282,7 +282,7 @@ def test_checkout_checklist_by_staff_terminates_contract(client, auth_client, db
         f"/contracts/{c.contract_id}/checklists",
         json={"type": "check-out", "items": []},
     )
-    assert res.status_code == 200
+    assert res.status_code == 201
     db.refresh(c)
     assert c.status == models.ContractStatus.terminated
 

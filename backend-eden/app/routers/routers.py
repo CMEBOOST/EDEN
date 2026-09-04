@@ -72,7 +72,12 @@ def me_route(user: models.Users = Depends(get_current_user)):
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.post("/", response_model=schemas.UserOut, dependencies=[Depends(require_admin)])
+@router.post(
+    "/",
+    response_model=schemas.UserOut,
+    dependencies=[Depends(require_admin)],
+    status_code=201,
+)
 def create_user_route(user: schemas.User, db: Session = Depends(get_db)):
     if user_crud.get_user_by_username(db, user.username) is not None:
         raise HTTPException(status_code=409, detail="username นี้มีอยู่แล้ว")
@@ -167,7 +172,7 @@ def set_password_route(
 upload_router = APIRouter(prefix="/upload", tags=["Uploads"], dependencies=_staff)
 
 
-@upload_router.post("/")
+@upload_router.post("/", status_code=201)
 def upload_file_route(file: UploadFile = File(...)):
     return {"url": save_upload(file), "filename": file.filename}
 
@@ -178,7 +183,9 @@ def upload_file_route(file: UploadFile = File(...)):
 tenant_router = APIRouter(prefix="/tenants", tags=["Tenants"], dependencies=_staff)
 
 
-@tenant_router.post("/", response_model=schemas.TenantOut, dependencies=_staff)
+@tenant_router.post(
+    "/", response_model=schemas.TenantOut, dependencies=_staff, status_code=201
+)
 def create_tenant_route(tenant: schemas.Tenants, db: Session = Depends(get_db)):
     user = user_crud.get_user_by_id(db=db, user_id=tenant.user_id)
     if user is None:
@@ -233,7 +240,7 @@ def delete_tenant_route(tenant_id: int, db: Session = Depends(get_db)):
 
 
 # --- เอกสารของผู้เช่า ---
-@tenant_router.post("/{tenant_id}/documents", dependencies=_staff)
+@tenant_router.post("/{tenant_id}/documents", dependencies=_staff, status_code=201)
 def create_document_route(
     tenant_id: int,
     data: schemas.DocumentCreate,
@@ -272,7 +279,7 @@ contract_router = APIRouter(
 )
 
 
-@contract_router.post("/", dependencies=_staff)
+@contract_router.post("/", dependencies=_staff, status_code=201)
 def create_contract_route(
     contract: schemas.Contracts,
     db: Session = Depends(get_db),
@@ -349,7 +356,7 @@ def list_contracts_route(
     )
 
 
-@contract_router.get("/{contract_id}")
+@contract_router.get("/{contract_id:int}")
 def get_contract_route(contract_id: int, db: Session = Depends(get_db)):
     contract = contracts_crud.get_contract(db=db, contract_id=contract_id)
     if contract is None:
@@ -357,7 +364,7 @@ def get_contract_route(contract_id: int, db: Session = Depends(get_db)):
     return contract
 
 
-@contract_router.put("/{contract_id}")
+@contract_router.put("/{contract_id:int}")
 def update_contract_route(
     contract_id: int,
     data: schemas.ContractUpdate,
@@ -400,7 +407,7 @@ def update_contract_route(
     return contract
 
 
-@contract_router.delete("/{contract_id}", dependencies=_admin)
+@contract_router.delete("/{contract_id:int}", dependencies=_admin)
 def delete_contract_route(contract_id: int, db: Session = Depends(get_db)):
     contract = contracts_crud.delete_contract(db=db, contract_id=contract_id)
     if contract is None:
@@ -409,7 +416,9 @@ def delete_contract_route(contract_id: int, db: Session = Depends(get_db)):
 
 
 # --- checklist สภาพห้อง ---
-@contract_router.post("/{contract_id}/checklists", dependencies=_staff)
+@contract_router.post(
+    "/{contract_id:int}/checklists", dependencies=_staff, status_code=201
+)
 def create_checklist_route(
     contract_id: int,
     data: schemas.ChecklistCreate,
@@ -437,12 +446,12 @@ def create_checklist_route(
     return checklist
 
 
-@contract_router.get("/{contract_id}/checklists")
+@contract_router.get("/{contract_id:int}/checklists")
 def list_checklists_route(contract_id: int, db: Session = Depends(get_db)):
     return checklist_crud.get_checklists(db=db, contract_id=contract_id)
 
 
-@contract_router.patch("/{contract_id}/checklists/{cc_id}", dependencies=_staff)
+@contract_router.patch("/{contract_id:int}/checklists/{cc_id:int}", dependencies=_staff)
 def update_checklist_route(
     contract_id: int,
     cc_id: int,
@@ -455,7 +464,9 @@ def update_checklist_route(
     return checklist_crud.update_checklist(db=db, cc_id=cc_id, data=data)
 
 
-@contract_router.delete("/{contract_id}/checklists/{cc_id}", dependencies=_staff)
+@contract_router.delete(
+    "/{contract_id:int}/checklists/{cc_id:int}", dependencies=_staff
+)
 def delete_checklist_route(contract_id: int, cc_id: int, db: Session = Depends(get_db)):
     existing = checklist_crud.get_checklist(db=db, cc_id=cc_id)
     if existing is None or existing.contract_id != contract_id:
@@ -491,7 +502,7 @@ def list_rooms_route(available: bool = False, db: Session = Depends(get_db)):
 rate_router = APIRouter(prefix="/rates", tags=["Rates"], dependencies=_auth)
 
 
-@rate_router.post("/", dependencies=_admin)
+@rate_router.post("/", dependencies=_admin, status_code=201)
 def create_rate_route(
     rate: schemas.RateConfig,
     db: Session = Depends(get_db),
@@ -594,7 +605,7 @@ def _role(user: models.Users) -> str:
     return user.role.value if hasattr(user.role, "value") else user.role
 
 
-@request_router.post("/")
+@request_router.post("/", status_code=201)
 def create_request_route(
     data: schemas.ContractRequestCreate,
     db: Session = Depends(get_db),
