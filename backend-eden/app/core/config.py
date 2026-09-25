@@ -17,3 +17,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "480"
 # ไม่ตั้ง = อนุมานจาก SECRET_KEY (dev ใช้ได้เลย) · prod แนะนำให้ตั้งแยก
 # gen: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 FIELD_ENCRYPTION_KEY = os.getenv("FIELD_ENCRYPTION_KEY")
+
+# origin ที่อนุญาตให้เรียก API ได้ (CORS) — คั่นด้วย , เช่น "https://app.vercel.app,http://localhost:5173"
+# ไม่ตั้ง = default dev origin เดียว
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
+    if origin.strip()
+]

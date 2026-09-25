@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from .core.audit import AuditMiddleware
 from .core.auth import get_user_for_file
+from .core.config import CORS_ORIGINS
 from .core.errors import ErrorHandlerMiddleware
 from .core.storage import UPLOAD_DIR
 from .crud import file_crud
@@ -28,7 +29,7 @@ app.add_middleware(AuditMiddleware)
 app.add_middleware(ErrorHandlerMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

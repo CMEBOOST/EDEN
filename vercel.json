@@ -1,0 +1,8 @@
+{
+  "buildCommand": "cd frontend-eden && npm run build",
+  "outputDirectory": "frontend-eden/dist",
+  "installCommand": "cd frontend-eden && npm install",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
