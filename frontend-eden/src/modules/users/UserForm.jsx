@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../../auth/AuthContext";
 import { useCreateUser } from "../../data/users";
+import { useToast } from "../../components/Toast";
 
 const inputCls =
   "border border-gray-300 rounded px-3 py-2 text-sm outline-none focus:border-blue-500 w-full";
@@ -24,6 +25,7 @@ function UserForm({ onClose }) {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const createUser = useCreateUser();
+  const toast = useToast();
   const [form, setForm] = useState({
     username: "",
     password: "",
@@ -50,6 +52,7 @@ function UserForm({ onClose }) {
         password: form.password,
         role: form.role,
       });
+      toast.success(`เพิ่มผู้ใช้ "${form.username.trim()}" สำเร็จ`);
       onClose?.();
     } catch (err) {
       setError(err.message);

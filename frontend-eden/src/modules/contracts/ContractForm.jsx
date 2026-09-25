@@ -9,6 +9,7 @@ import { useCreateContract } from "../../data/contracts";
 import ChecklistEditor from "./ChecklistEditor";
 import DocumentUploader from "./DocumentUploader";
 import FileDropField from "../../components/FileDropField";
+import { useToast } from "../../components/Toast";
 
 const fmtBaht = (n) =>
   Number(n).toLocaleString(undefined, { minimumFractionDigits: 2 });
@@ -58,6 +59,7 @@ function Field({ label, required, children }) {
 function ContractForm() {
   const navigate = useNavigate();
   const createContract = useCreateContract();
+  const toast = useToast();
 
   const { data: tenants = [] } = useTenants();
   const { data: rooms = [] } = useRooms({ available: true }); // ห้องว่าง (สำหรับ dropdown)
@@ -126,6 +128,14 @@ function ContractForm() {
           .map((d) => ({ doc_type: d.doc_type, file_url: d.file_url })),
       });
 
+      const tenantName = tenants.find(
+        (t) => t.tenant_id === Number(contract.tenant_id)
+      )?.full_name;
+      toast.success(
+        tenantName
+          ? `เพิ่มสัญญาเช่าของ "${tenantName}" สำเร็จ`
+          : "เพิ่มสัญญาเช่าสำเร็จ"
+      );
       navigate("/contracts");
     } catch (err) {
       setError(err.message);

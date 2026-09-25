@@ -5,6 +5,7 @@ import {
   useUpdateTenant,
 } from "../../data/tenants";
 import { useUsers } from "../../data/users";
+import { useToast } from "../../components/Toast";
 
 const EMPTY = {
   user_id: "",
@@ -36,6 +37,7 @@ function TenantForm({ tenant, onClose }) {
   const isEdit = Boolean(tenant);
   const createTenant = useCreateTenant();
   const updateTenant = useUpdateTenant();
+  const toast = useToast();
 
   const [form, setForm] = useState(() =>
     isEdit
@@ -95,6 +97,7 @@ function TenantForm({ tenant, onClose }) {
           ...common,
           user_id: Number(form.user_id),
         });
+        toast.success(`เพิ่มผู้เช่า "${common.full_name}" สำเร็จ`);
       }
       onClose?.();
     } catch (err) {
