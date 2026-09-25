@@ -8,6 +8,8 @@ async function request(path, options = {}) {
   const token = getToken();
   const headers = { ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
+  // ข้าม interstitial warning page ของ ngrok free tier (backend ไม่มี effect ถ้าไม่ได้ผ่าน ngrok)
+  headers["ngrok-skip-browser-warning"] = "true";
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
 
