@@ -1,5 +1,6 @@
 import { formatDate } from "../../lib/datetime";
 import { avatarSrc } from "../../lib/avatar";
+import Avatar from "../../components/Avatar";
 
 const roleLabel = { admin: "ผู้ดูแลระบบ", staff: "พนักงาน", tenant: "ผู้เช่า" };
 
@@ -21,7 +22,7 @@ function TenantAccountSection({ user }) {
         <p className="text-sm text-gray-400">โหลดข้อมูลบัญชีไม่ได้</p>
       ) : (
         <div className="flex items-center gap-4">
-          <img
+          <Avatar
             src={avatarSrc(user)}
             alt=""
             className="w-12 h-12 rounded-full object-cover border border-gray-200 shrink-0"

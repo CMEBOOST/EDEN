@@ -4,6 +4,7 @@ import { avatarSrc } from "../../lib/avatar";
 import { useAuth } from "../../auth/AuthContext";
 import { useUsers, useSetUserRole, useSetUserActive } from "../../data/users";
 import { useTenants } from "../../data/tenants";
+import Avatar from "../../components/Avatar";
 import ConfirmDialog from "../../components/ConfirmDialog";
 import UserForm from "./UserForm";
 import UserEditModal from "./UserEditModal";
@@ -149,7 +150,7 @@ function Users() {
                   >
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
-                        <img
+                        <Avatar
                           src={avatarSrc(u)}
                           alt=""
                           className="w-8 h-8 rounded-full object-cover border border-gray-200 shrink-0"

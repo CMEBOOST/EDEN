@@ -1,4 +1,5 @@
 import { useEffect, useMemo } from "react";
+import Avatar from "./Avatar";
 import { avatarSrc, AVATAR_PRESETS, PRESET_OPTIONS } from "../lib/avatar";
 
 // controlled: value = string|null (preset key / "/uploads/..." / null), file = File|null
@@ -18,7 +19,7 @@ function AvatarPicker({ value, file, role, onChangeValue, onChangeFile }) {
 
   return (
     <div className="flex items-center gap-4">
-      <img
+      <Avatar
         src={previewSrc}
         alt=""
         className="w-16 h-16 rounded-full object-cover border border-gray-200"

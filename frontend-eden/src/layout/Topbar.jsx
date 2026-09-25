@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import Avatar from "../components/Avatar";
 import { avatarSrc } from "../lib/avatar";
 import { crumbsFor } from "./breadcrumbs";
 
@@ -73,7 +74,7 @@ function UserMenu() {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 border border-gray-200 pl-1.5 pr-2 py-1 rounded-lg hover:bg-gray-50 transition-colors"
       >
-        <img
+        <Avatar
           src={avatarSrc(user)}
           alt=""
           className="w-8 h-8 rounded-full object-cover"
@@ -101,7 +102,7 @@ function UserMenu() {
           className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-200 rounded-xl shadow-lg py-1 z-50"
         >
           <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100">
-            <img
+            <Avatar
               src={avatarSrc(user)}
               alt=""
               className="w-8 h-8 rounded-full object-cover"
